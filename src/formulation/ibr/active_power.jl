@@ -26,11 +26,12 @@ function update_Pext!(
     return nothing
 end
 
-# The integrator stops while the PI output is at a limit and the error pushes it further out (anti-windup). The status
-# is decided from the values at ts and kept for the whole step, at both ends of the trapezoidal rule. Deciding it at
-# ts + 1 would depend on yp at ts + 1 itself, and when the limit is crossed within the step no value of yp at ts + 1
-# satisfies its own condition, so the corrector would alternate between two values without converging.
-# The dip signal will be a third condition that also stops it
+# The integrator stops while the PI output is at a limit and the error pushes it further out (anti-windup), and during
+# the voltage dip, Vt < Vdip, so it does not accumulate error while Pmed falls with a fault, which would cause a power
+# spike after the clearing. The status is decided from the values at ts and kept for the whole step, at both ends of
+# the trapezoidal rule. Deciding it at ts + 1 would depend on yp at ts + 1 itself, and when the limit is crossed within
+# the step no value of yp at ts + 1 satisfies its own condition, so the corrector would alternate between two values
+# without converging
 function yp_frozen(
     inputs::Inputs,
     ibr::IBR,
@@ -38,6 +39,9 @@ function yp_frozen(
     freq_estimation_state::BusFreqEstimationState,
     ts::Int,
 )
+    if state.Vt[ts] < ibr_Vdip(ibr)
+        return true
+    end
     ep = active_power_error(inputs, ibr, state, freq_estimation_state, ts)
     unlimited_Pext = state.xp[ts] + state.yp[ts]
     if unlimited_Pext >= ibr_Pmax(inputs, ibr) && ep > 0.0
