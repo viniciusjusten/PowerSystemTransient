@@ -26,6 +26,8 @@ function reset_element_states!(inputs::Inputs)
 end
 
 function initialization(inputs::Inputs)
+    validate_ibr_freq_estimations(inputs)
+
     results = Results(inputs)
 
     reset_element_states!(inputs)
