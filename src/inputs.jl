@@ -12,6 +12,7 @@ mutable struct Inputs
     buses::Vector{Bus}
     circuits::Vector{Circuit}
     generators::Vector{Generator}
+    ibrs::Vector{IBR}
     loads::Vector{Load}
     perturbations::Vector{Perturbation}
 
@@ -29,6 +30,7 @@ function Inputs(;
     max_iterations::Int = 50,
     buses::Vector{Bus} = Bus[],
     circuits::Vector{Circuit} = Circuit[],
+    ibrs::Vector{IBR} = IBR[],
     # the vectors of abstract types also accept vectors of a single concrete model, such as [GeneratorTrip(...)],
     # and the struct converts them to the abstract element type
     generators::Vector{<:Generator} = Generator[],
@@ -48,6 +50,7 @@ function Inputs(;
         buses,
         circuits,
         generators,
+        ibrs,
         loads,
         perturbations,
         Ybus_cache,
@@ -94,6 +97,8 @@ get_circuit(inputs::Inputs, idx::Int) = inputs.circuits[idx]
 
 get_generator(inputs::Inputs, idx::Int) = inputs.generators[idx]
 
+get_ibr(inputs::Inputs, idx::Int) = inputs.ibrs[idx]
+
 get_load(inputs::Inputs, idx::Int) = inputs.loads[idx]
 
 get_perturbation(inputs::Inputs, idx::Int) = inputs.perturbations[idx]
@@ -103,6 +108,8 @@ num_buses(inputs::Inputs) = length(inputs.buses)
 num_circuits(inputs::Inputs) = length(inputs.circuits)
 
 num_generators(inputs::Inputs) = length(inputs.generators)
+
+num_ibrs(inputs::Inputs) = length(inputs.ibrs)
 
 num_loads(inputs::Inputs) = length(inputs.loads)
 

@@ -59,9 +59,17 @@ function output_units(inputs::Inputs, field::Symbol)
         return [("pu", 1.0), ("Hz", fb(inputs))]
     elseif field == :Pmec_1 || field == :Pmec || field == :Pref || field == :Pele
         return [("pu", 1.0), ("MW", Sb(inputs))]
+    elseif field == :Pset || field == :Pmed || field == :xp || field == :yp || field == :Pext
+        return [("pu", 1.0), ("MW", Sb(inputs))]
+    elseif field == :Qmed || field == :xq || field == :yq || field == :Qext || field == :Qref
+        return [("pu", 1.0), ("Mvar", Sb(inputs))]
     elseif field == :Eq_prime || field == :ed_prime || field == :eq_prime || field == :efd || field == :efdu || field == :Vref || field == :Vt
         return [("pu", 1.0)]
     elseif field == :id || field == :iq
+        return [("pu", 1.0)]
+    elseif field == :iq_inj || field == :Ip_cmd_pre || field == :Iq_cmd_pre || field == :Ip_max || field == :Iq_max || field == :Ip_cmd || field == :Iq_cmd
+        return [("pu", 1.0)]
+    elseif field == :Ip || field == :Iq || field == :Ip_ef
         return [("pu", 1.0)]
     end
     error("No output unit is defined for the field $field.")
@@ -141,6 +149,9 @@ function write_results(inputs::Inputs, results::Results, output_path::String)
 
     generator_names = [generator_name(generator) for generator in inputs.generators]
     write_class_results(inputs, output_path, "generator", time, generator_names, results.generator)
+
+    ibr_names = [ibr_name(ibr) for ibr in inputs.ibrs]
+    write_class_results(inputs, output_path, "ibr", time, ibr_names, results.ibr)
 
     write_case_description(inputs, results, output_path)
 

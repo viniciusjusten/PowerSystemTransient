@@ -3,6 +3,7 @@ mutable struct Bus
 
     generator_idx::Union{Int, Nothing} # index of the generator connected to this bus, if any
     load_idx::Union{Int, Nothing} # index of the load connected to this bus, if any
+    ibr_idx::Union{Int, Nothing} # index of the IBR connected to this bus, if any
 
     voltage::Float64 # voltage magnitude at the power flow solution, in pu
     angle::Float64 # voltage angle at the power flow solution, in rad
@@ -22,12 +23,14 @@ function Bus(;
     shunt_susceptance::Float64,
     generator_idx::Union{Int, Nothing} = nothing,
     load_idx::Union{Int, Nothing} = nothing,
+    ibr_idx::Union{Int, Nothing} = nothing,
     freq_estimation::Union{Nothing, BusFreqEstimation} = nothing,
 )
     return Bus(
         name,
         generator_idx,
         load_idx,
+        ibr_idx,
         voltage,
         angle,
         shunt_susceptance,
@@ -41,6 +44,8 @@ bus_name(bus::Bus) = bus.name
 bus_generator_idx(bus::Bus) = bus.generator_idx
 
 bus_load_idx(bus::Bus) = bus.load_idx
+
+bus_ibr_idx(bus::Bus) = bus.ibr_idx
 
 bus_voltage(bus::Bus) = bus.voltage
 

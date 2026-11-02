@@ -11,12 +11,23 @@ mutable struct StepCache
     Vi::Vector{Float64}
     x_theta::Vector{Float64}
     omega_estim::Vector{Float64}
+    yp::Vector{Float64}
+    Pref::Vector{Float64}
+    yq::Vector{Float64}
+    Qref::Vector{Float64}
+    Ip::Vector{Float64}
+    Iq::Vector{Float64}
 end
 
 function StepCache(inputs::Inputs)
     n_generators = num_generators(inputs)
     n_buses = num_buses(inputs)
-    return StepCache(zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_buses), zeros(n_buses), zeros(n_buses), zeros(n_buses))
+    n_ibrs = num_ibrs(inputs)
+    return StepCache(
+        zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators),
+        zeros(n_buses), zeros(n_buses), zeros(n_buses), zeros(n_buses),
+        zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs),
+    )
 end
 
 function cache_step!(inputs::Inputs, results::Results, ts::Int, caches::StepCache)
@@ -57,6 +68,15 @@ function cache_step!(inputs::Inputs, results::Results, ts::Int, caches::StepCach
             caches.omega_estim[bus_idx] = freq_estimation_state.omega[ts+1]
         end
     end
+    for ibr_idx in 1:num_ibrs(inputs)
+        state = results.ibr[ibr_idx]
+        caches.yp[ibr_idx] = state.yp[ts+1]
+        caches.Pref[ibr_idx] = state.Pref[ts+1]
+        caches.yq[ibr_idx] = state.yq[ts+1]
+        caches.Qref[ibr_idx] = state.Qref[ts+1]
+        caches.Ip[ibr_idx] = state.Ip[ts+1]
+        caches.Iq[ibr_idx] = state.Iq[ts+1]
+    end
     return nothing
 end
 
@@ -91,6 +111,15 @@ function step_converged(inputs::Inputs, results::Results, ts::Int, caches::StepC
             max_dif = max(max_dif, abs(caches.x_theta[bus_idx] - freq_estimation_state.x_theta[ts+1]))
             max_dif = max(max_dif, abs(caches.omega_estim[bus_idx] - freq_estimation_state.omega[ts+1]))
         end
+    end
+    for ibr_idx in 1:num_ibrs(inputs)
+        state = results.ibr[ibr_idx]
+        max_dif = max(max_dif, abs(caches.yp[ibr_idx] - state.yp[ts+1]))
+        max_dif = max(max_dif, abs(caches.Pref[ibr_idx] - state.Pref[ts+1]))
+        max_dif = max(max_dif, abs(caches.yq[ibr_idx] - state.yq[ts+1]))
+        max_dif = max(max_dif, abs(caches.Qref[ibr_idx] - state.Qref[ts+1]))
+        max_dif = max(max_dif, abs(caches.Ip[ibr_idx] - state.Ip[ts+1]))
+        max_dif = max(max_dif, abs(caches.Iq[ibr_idx] - state.Iq[ts+1]))
     end
 
     return max_dif < tolerance(inputs)
@@ -158,6 +187,13 @@ function step!(inputs::Inputs, results::Results, ts::Int)
         freq_estimation = bus_freq_estimation(bus)
         predict_bus_freq_estimation!(inputs, freq_estimation, bus_state.freq_estimation, bus_state, ts)
     end
+    for (ibr, state) in zip(inputs.ibrs, results.ibr)
+        bus_idx = ibr_bus(ibr)
+        freq_estimation_state = results.bus[bus_idx].freq_estimation
+        predict_active_power_control!(inputs, ibr, state, freq_estimation_state, ts)
+        predict_reactive_power_control!(inputs, ibr, state, ts)
+        predict_converter!(inputs, ibr, state, ts)
+    end
     solve_network!(inputs, results, ts + 1) # V[ts+1] and Pele[ts+1] from the predicted states
 
     for iteration in 1:max_iterations(inputs)
@@ -179,6 +215,15 @@ function step!(inputs::Inputs, results::Results, ts::Int)
         for (bus, bus_state) in zip(inputs.buses, results.bus)
             freq_estimation = bus_freq_estimation(bus)
             step_bus_freq_estimation!(inputs, freq_estimation, bus_state.freq_estimation, bus_state, ts)
+        end
+        # the IBR controls take omega at ts + 1 from the frequency estimation of their bus, so they come after it, and
+        # the converter takes Pref and Qref at ts + 1 from the controls
+        for (ibr, state) in zip(inputs.ibrs, results.ibr)
+            bus_idx = ibr_bus(ibr)
+            freq_estimation_state = results.bus[bus_idx].freq_estimation
+            step_active_power_control!(inputs, ibr, state, freq_estimation_state, ts)
+            step_reactive_power_control!(inputs, ibr, state, ts)
+            step_converter!(inputs, ibr, state, ts)
         end
         solve_network!(inputs, results, ts + 1)
 

@@ -20,7 +20,7 @@ function add_state_trajectories!(
     return nothing
 end
 
-# The trajectories of every time series stored in the generator and bus states,
+# The trajectories of every time series stored in the generator, IBR and bus states,
 # named as class_element_field, for example generator_UG1_delta
 function model_trajectories(inputs::nsLFT.Inputs, results::nsLFT.Results)
     column_names = String[]
@@ -28,6 +28,10 @@ function model_trajectories(inputs::nsLFT.Inputs, results::nsLFT.Results)
     for (generator, state) in zip(inputs.generators, results.generator)
         generator_name = nsLFT.generator_name(generator)
         add_state_trajectories!(column_names, columns, "generator", generator_name, state)
+    end
+    for (ibr, state) in zip(inputs.ibrs, results.ibr)
+        ibr_name = nsLFT.ibr_name(ibr)
+        add_state_trajectories!(column_names, columns, "ibr", ibr_name, state)
     end
     for (bus, state) in zip(inputs.buses, results.bus)
         bus_name = nsLFT.bus_name(bus)
