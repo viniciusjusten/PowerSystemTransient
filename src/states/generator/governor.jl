@@ -10,6 +10,8 @@ function Droop1stOrderState(num_steps::Int)
     return Droop1stOrderState(fill(NaN, num_steps), fill(NaN, num_steps))
 end
 
+convergence_variables(::Droop1stOrderState) = [:Pmec_1]
+
 function allocate_governor_state(::Droop1stOrder, num_steps::Int)
     return Droop1stOrderState(num_steps)
 end

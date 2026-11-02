@@ -32,6 +32,8 @@ function ClassicGeneratorState(num_steps::Int, governor::Union{Nothing, Governor
     )
 end
 
+convergence_variables(::ClassicGeneratorState) = [:delta, :omega, :Pmec]
+
 function allocate_generator_state(generator::ClassicGenerator, num_steps::Int)
     governor = allocate_governor_state(generator_governor(generator), num_steps)
     return ClassicGeneratorState(num_steps, governor)
@@ -75,6 +77,8 @@ function OneDOneQGeneratorState(
         voltage_regulator,
     )
 end
+
+convergence_variables(::OneDOneQGeneratorState) = [:delta, :omega, :eq_prime, :ed_prime, :efd, :Pmec]
 
 function allocate_generator_state(generator::OneDOneQGenerator, num_steps::Int)
     governor = allocate_governor_state(generator_governor(generator), num_steps)

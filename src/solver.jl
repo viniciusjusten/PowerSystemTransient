@@ -1,128 +1,34 @@
-# values at ts + 1 from the previous corrector iteration, used to check convergence
-mutable struct StepCache
-    delta::Vector{Float64}
-    omega::Vector{Float64}
-    eq_prime::Vector{Float64}
-    ed_prime::Vector{Float64}
-    efd::Vector{Float64}
-    Pmec_1::Vector{Float64}
-    Pmec::Vector{Float64}
-    Vr::Vector{Float64}
-    Vi::Vector{Float64}
-    x_theta::Vector{Float64}
-    omega_estim::Vector{Float64}
-    yp::Vector{Float64}
-    Pref::Vector{Float64}
-    yq::Vector{Float64}
-    Qref::Vector{Float64}
-    Ip::Vector{Float64}
-    Iq::Vector{Float64}
-end
-
-function StepCache(inputs::Inputs)
-    n_generators = num_generators(inputs)
-    n_buses = num_buses(inputs)
-    n_ibrs = num_ibrs(inputs)
-    return StepCache(
-        zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators), zeros(n_generators),
-        zeros(n_buses), zeros(n_buses), zeros(n_buses), zeros(n_buses),
-        zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs), zeros(n_ibrs),
-    )
-end
-
-function cache_step!(inputs::Inputs, results::Results, ts::Int, caches::StepCache)
-    for gen_idx in 1:num_generators(inputs)
-        caches.delta[gen_idx] = results.generator[gen_idx].delta[ts+1]
-        caches.omega[gen_idx] = results.generator[gen_idx].omega[ts+1]
-        if results.generator[gen_idx] isa ClassicGeneratorState
-            caches.eq_prime[gen_idx] = 0.0
-            caches.ed_prime[gen_idx] = 0.0
-            caches.efd[gen_idx] = 0.0
-        elseif results.generator[gen_idx] isa OneDOneQGeneratorState
-            caches.eq_prime[gen_idx] = results.generator[gen_idx].eq_prime[ts+1]
-            caches.ed_prime[gen_idx] = results.generator[gen_idx].ed_prime[ts+1]
-            caches.efd[gen_idx] = results.generator[gen_idx].efd[ts+1]
-        else
-            error("Unknown generator state type: $(typeof(results.generator[gen_idx]))")
-        end
-        caches.Pmec[gen_idx] = results.generator[gen_idx].Pmec[ts+1]
-        # Pmec_1 belongs to the governor, so only the generators with a governor have it
-        governor_state = results.generator[gen_idx].governor
-        if isnothing(governor_state)
-            caches.Pmec_1[gen_idx] = 0.0
-        else
-            caches.Pmec_1[gen_idx] = governor_state.Pmec_1[ts+1]
-        end
+# Each state type lists in convergence_variables the variables the corrector checks, and the control states nested in
+# a state, such as the governor of a generator or the frequency estimation of a bus, list their own. A control that is
+# absent is nothing, which is not a ControlState, so it adds no values
+function push_convergence_values!(values::Vector{Float64}, state, ts::Int)
+    for field in convergence_variables(state)
+        series = getfield(state, field)
+        push!(values, series[ts])
     end
-    for bus_idx in 1:num_buses(inputs)
-        caches.Vr[bus_idx] = results.bus[bus_idx].Vr[ts+1]
-        caches.Vi[bus_idx] = results.bus[bus_idx].Vi[ts+1]
-        # x_theta and the estimated omega belong to the frequency estimation, so only the buses with an estimation
-        # have them
-        freq_estimation_state = results.bus[bus_idx].freq_estimation
-        if isnothing(freq_estimation_state)
-            caches.x_theta[bus_idx] = 0.0
-            caches.omega_estim[bus_idx] = 0.0
-        else
-            caches.x_theta[bus_idx] = freq_estimation_state.x_theta[ts+1]
-            caches.omega_estim[bus_idx] = freq_estimation_state.omega[ts+1]
+    for field in fieldnames(typeof(state))
+        value = getfield(state, field)
+        if value isa ControlState
+            push_convergence_values!(values, value, ts)
         end
-    end
-    for ibr_idx in 1:num_ibrs(inputs)
-        state = results.ibr[ibr_idx]
-        caches.yp[ibr_idx] = state.yp[ts+1]
-        caches.Pref[ibr_idx] = state.Pref[ts+1]
-        caches.yq[ibr_idx] = state.yq[ts+1]
-        caches.Qref[ibr_idx] = state.Qref[ts+1]
-        caches.Ip[ibr_idx] = state.Ip[ts+1]
-        caches.Iq[ibr_idx] = state.Iq[ts+1]
     end
     return nothing
 end
 
-function step_converged(inputs::Inputs, results::Results, ts::Int, caches::StepCache)
-    max_dif = 0.0
-
-    # the first index in results corresponds to the initial state (t = 0),
-    # so the current time step is ts + 1
-    for gen_idx in 1:num_generators(inputs)
-        max_dif = max(max_dif, abs(caches.delta[gen_idx] - results.generator[gen_idx].delta[ts+1]))
-        max_dif = max(max_dif, abs(caches.omega[gen_idx] - results.generator[gen_idx].omega[ts+1]))
-        if results.generator[gen_idx] isa ClassicGeneratorState
-            continue
-        elseif results.generator[gen_idx] isa OneDOneQGeneratorState
-            max_dif = max(max_dif, abs(caches.eq_prime[gen_idx] - results.generator[gen_idx].eq_prime[ts+1]))
-            max_dif = max(max_dif, abs(caches.ed_prime[gen_idx] - results.generator[gen_idx].ed_prime[ts+1]))
-            max_dif = max(max_dif, abs(caches.efd[gen_idx] - results.generator[gen_idx].efd[ts+1]))
-        else
-            error("Unknown generator state type: $(typeof(results.generator[gen_idx]))")
-        end
-        governor_state = results.generator[gen_idx].governor
-        if !isnothing(governor_state)
-            max_dif = max(max_dif, abs(caches.Pmec_1[gen_idx] - governor_state.Pmec_1[ts+1]))
-        end
-        max_dif = max(max_dif, abs(caches.Pmec[gen_idx] - results.generator[gen_idx].Pmec[ts+1]))
+# the values at ts of the variables the corrector checks, always collected in the same order, so the values of two
+# iterations can be compared position by position
+function convergence_values(results::Results, ts::Int)
+    values = Float64[]
+    for state in results.generator
+        push_convergence_values!(values, state, ts)
     end
-    for bus_idx in 1:num_buses(inputs)
-        max_dif = max(max_dif, abs(caches.Vr[bus_idx] - results.bus[bus_idx].Vr[ts+1]))
-        max_dif = max(max_dif, abs(caches.Vi[bus_idx] - results.bus[bus_idx].Vi[ts+1]))
-        freq_estimation_state = results.bus[bus_idx].freq_estimation
-        if !isnothing(freq_estimation_state)
-            max_dif = max(max_dif, abs(caches.x_theta[bus_idx] - freq_estimation_state.x_theta[ts+1]))
-            max_dif = max(max_dif, abs(caches.omega_estim[bus_idx] - freq_estimation_state.omega[ts+1]))
-        end
+    for state in results.bus
+        push_convergence_values!(values, state, ts)
     end
-    for ibr_idx in 1:num_ibrs(inputs)
-        state = results.ibr[ibr_idx]
-        max_dif = max(max_dif, abs(caches.yp[ibr_idx] - state.yp[ts+1]))
-        max_dif = max(max_dif, abs(caches.Pref[ibr_idx] - state.Pref[ts+1]))
-        max_dif = max(max_dif, abs(caches.yq[ibr_idx] - state.yq[ts+1]))
-        max_dif = max(max_dif, abs(caches.Qref[ibr_idx] - state.Qref[ts+1]))
-        max_dif = max(max_dif, abs(caches.Ip[ibr_idx] - state.Ip[ts+1]))
-        max_dif = max(max_dif, abs(caches.Iq[ibr_idx] - state.Iq[ts+1]))
+    for state in results.ibr
+        push_convergence_values!(values, state, ts)
     end
-
-    return max_dif < tolerance(inputs)
+    return values
 end
 
 function predict_voltages!(results::Results, ts::Int)
@@ -165,8 +71,6 @@ end
 
 # advances the simulation from the time index ts to ts + 1
 function step!(inputs::Inputs, results::Results, ts::Int)
-    caches = StepCache(inputs)
-
     apply_perturbations!(inputs, results, ts) # update Ybus and the network solution at ts if there are perturbations at this instant
 
     predict_voltages!(results, ts)
@@ -185,7 +89,7 @@ function step!(inputs::Inputs, results::Results, ts::Int)
     solve_network!(inputs, results, ts + 1) # V[ts+1] and Pele[ts+1] from the predicted states
 
     for iteration in 1:max_iterations(inputs)
-        cache_step!(inputs, results, ts, caches) # delta, omega, Vr and Vi at ts+1
+        previous_values = convergence_values(results, ts + 1) # values at ts + 1 from the previous iteration
 
         for (generator, state) in zip(inputs.generators, results.generator)
             step_generator!(inputs, generator, state, ts)
@@ -202,7 +106,10 @@ function step!(inputs::Inputs, results::Results, ts::Int)
         end
         solve_network!(inputs, results, ts + 1)
 
-        if step_converged(inputs, results, ts, caches)
+        # a value not yet computed is NaN, and so is its difference, which keeps the step from converging
+        current_values = convergence_values(results, ts + 1)
+        differences = abs.(current_values .- previous_values)
+        if maximum(differences) < tolerance(inputs)
             return nothing
         end
     end

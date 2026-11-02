@@ -10,6 +10,9 @@ function Static1stOrderState(num_steps::Int)
     return Static1stOrderState(fill(NaN, num_steps), fill(NaN, num_steps))
 end
 
+# the generator checks efd, which stays at a limit while the windup limiter acts, so efdu is checked as well
+convergence_variables(::Static1stOrderState) = [:efdu]
+
 function allocate_voltage_regulator_state(::Static1stOrder, num_steps::Int)
     return Static1stOrderState(num_steps)
 end

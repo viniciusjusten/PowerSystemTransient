@@ -61,3 +61,5 @@ function IBRState(num_steps::Int)
         fill(NaN, num_steps),
     )
 end
+
+convergence_variables(::IBRState) = [:yp, :Pref, :yq, :Qref, :Ip, :Iq]

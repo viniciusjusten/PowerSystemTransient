@@ -11,6 +11,9 @@ function BusState(num_steps::Int, freq_estimation::Union{Nothing, BusFreqEstimat
     return BusState(fill(NaN, num_steps), fill(NaN, num_steps), freq_estimation)
 end
 
+# the voltages are algebraic, but they come from the network solution that the corrector iterates
+convergence_variables(::BusState) = [:Vr, :Vi]
+
 function allocate_bus_state(bus::Bus, num_steps::Int)
     freq_estimation = allocate_bus_freq_estimation_state(bus_freq_estimation(bus), num_steps)
     return BusState(num_steps, freq_estimation)

@@ -17,6 +17,8 @@ function FilteredAngleDerivativeState(num_steps::Int)
     )
 end
 
+convergence_variables(::FilteredAngleDerivativeState) = [:x_theta, :omega]
+
 function allocate_bus_freq_estimation_state(::FilteredAngleDerivative, num_steps::Int)
     return FilteredAngleDerivativeState(num_steps)
 end
