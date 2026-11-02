@@ -203,7 +203,7 @@ end
 
 # every state variable of the model and of its controls is listed with its value at t = 0, so a new model needs no
 # change here
-function generator_state_values(inputs::Inputs, state::GeneratorState)
+function state_initial_values(inputs::Inputs, state)
     values = Any[]
     for (field, value) in state_variables(state)
         initial = NaN
@@ -236,7 +236,7 @@ function generator_description(inputs::Inputs, generator::Generator, state::Gene
         power_quantity(inputs, "P0", generator_P0(generator), "MW"),
         power_quantity(inputs, "Q0", generator_Q0(generator), "Mvar"),
     ]
-    state_values = generator_state_values(inputs, state)
+    state_values = state_initial_values(inputs, state)
     append!(initial, state_values)
 
     return Pair{String, Any}[
@@ -245,6 +245,56 @@ function generator_description(inputs::Inputs, generator::Generator, state::Gene
         "model" => string(nameof(typeof(generator))),
         "initial" => initial,
         "parameters" => generator_parameters(generator),
+    ]
+end
+
+# the parameters are written in the IBR base, as the case data gives them
+function ibr_parameters(ibr::IBR)
+    return Any[
+        quantity("Sn", ibr_Sn(ibr), "MVA"),
+        quantity("D", ibr.D, "pu"),
+        quantity("Kpg", ibr.Kpg, "pu"),
+        quantity("Kig", ibr.Kig, "1/s"),
+        quantity("Pmax", ibr.Pmax, "pu"),
+        quantity("Pmin", ibr.Pmin, "pu"),
+        quantity("Tp", ibr.Tp, "s"),
+        quantity("Kc", ibr.Kc, "pu"),
+        quantity("Kp", ibr.Kp, "pu"),
+        quantity("Ki", ibr.Ki, "1/s"),
+        quantity("Qmax", ibr.Qmax, "pu"),
+        quantity("Qmin", ibr.Qmin, "pu"),
+        quantity("Tq", ibr.Tq, "s"),
+        quantity("Vfrz", ibr.Vfrz, "pu"),
+        quantity("Vdip", ibr.Vdip, "pu"),
+        quantity("Kqv", ibr.Kqv, "pu"),
+        quantity("Iqh1", ibr.Iqh1, "pu"),
+        quantity("Iql1", ibr.Iql1, "pu"),
+        quantity("Imax", ibr.Imax, "pu"),
+        quantity("Tg", ibr.Tg, "s"),
+        quantity("Rrpwr", ibr.Rrpwr, "pu/s"),
+        quantity("lv0", ibr.lv0, "pu"),
+        quantity("lv1", ibr.lv1, "pu"),
+    ]
+end
+
+# the battery flag and the current priority are not quantities, so they are written as keys of their own
+function ibr_description(inputs::Inputs, ibr::IBR, state::IBRState)
+    initial = Any[
+        power_quantity(inputs, "P0", ibr_P0(ibr), "MW"),
+        power_quantity(inputs, "Q0", ibr_Q0(ibr), "Mvar"),
+    ]
+    state_values = state_initial_values(inputs, state)
+    append!(initial, state_values)
+
+    priority = ibr_priority(ibr)
+    return Pair{String, Any}[
+        "name" => ibr_name(ibr),
+        "bus" => ibr_bus(ibr),
+        "model" => string(nameof(typeof(ibr))),
+        "battery" => ibr_battery(ibr),
+        "priority" => string(priority),
+        "initial" => initial,
+        "parameters" => ibr_parameters(ibr),
     ]
 end
 
@@ -325,6 +375,11 @@ function case_description(inputs::Inputs, results::Results)
         push!(generators, generator_description(inputs, generator, state, bus_state))
     end
 
+    ibrs = Any[]
+    for (ibr, state) in zip(inputs.ibrs, results.ibr)
+        push!(ibrs, ibr_description(inputs, ibr, state))
+    end
+
     loads = Any[]
     for load in inputs.loads
         bus = get_bus(inputs, load_bus(load))
@@ -342,6 +397,7 @@ function case_description(inputs::Inputs, results::Results)
         "buses" => buses,
         "circuits" => circuits,
         "generators" => generators,
+        "ibrs" => ibrs,
         "loads" => loads,
         "perturbations" => perturbations,
     ]

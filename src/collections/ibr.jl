@@ -52,6 +52,10 @@ mutable struct IBR
     # Power flow solution
     P0::Float64 # active power at the terminal, in pu
     Q0::Float64 # reactive power at the terminal, in pu
+
+    # TODO: add the trip of the IBR, as GeneratorTrip does for the synchronous generators. It needs a tripped field,
+    # reset by reset_element_states!, that removes the current of the IBR from the network solution and stops its
+    # controls
 end
 
 function IBR(;

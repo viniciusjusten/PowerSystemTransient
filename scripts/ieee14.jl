@@ -511,14 +511,80 @@ function ieee14_loads()
     ]
 end
 
-# the results are written to case_path
+# The IBR that replaces UG2, with the rated power of UG2 and the parameters in its own base. It injects the power of
+# UG2 in the power flow, so the operating point of the case does not change, and it starts at 91% of Imax
+function ieee14_ug2_ibr()
+    return nsLFT.IBR(;
+        name = "IBR2",
+        bus = 2,
+        Sn = 88.09334324,
+        battery = false,
+        D = 20.0,
+        Kpg = 0.5,
+        Kig = 2.0,
+        Pmax = 1.0,
+        Pmin = 0.0,
+        Tp = 0.1,
+        Kc = 0.02,
+        Kp = 2.0,
+        Ki = 10.0,
+        Qmax = 1.0,
+        Qmin = -1.0,
+        Tq = 0.05,
+        Vfrz = 0.7,
+        Vdip = 0.9,
+        Kqv = 2.0,
+        Iqh1 = 1.0,
+        Iql1 = -1.0,
+        Imax = 1.1,
+        priority = nsLFT.CurrentPriority.Q,
+        Tg = 0.02,
+        Rrpwr = 2.0,
+        lv0 = 0.4,
+        lv1 = 0.8,
+        P0 = 0.4,
+        Q0 = 0.69417986775,
+    )
+end
+
+# UG2 leaves the generators and its IBR takes bus 2, which gets the frequency estimation the IBR needs. The
+# generators after UG2 move one position up, so the generator index of their buses follows them
+function replace_ug2_with_ibr!(buses::Vector{nsLFT.Bus}, generators::Vector{nsLFT.Generator}, ibrs::Vector{nsLFT.IBR})
+    deleteat!(generators, 2)
+    ibr = ieee14_ug2_ibr()
+    push!(ibrs, ibr)
+    for bus in buses
+        generator_idx = nsLFT.bus_generator_idx(bus)
+        if isnothing(generator_idx)
+            continue
+        end
+        if generator_idx == 2
+            bus.generator_idx = nothing
+        elseif generator_idx > 2
+            bus.generator_idx = generator_idx - 1
+        end
+    end
+    ug2_bus = buses[2]
+    ug2_bus.ibr_idx = 1
+    ug2_bus.freq_estimation = nsLFT.FilteredAngleDerivative(; name = "Bus 02 freq", Tf = 0.05, Tw = 0.1)
+    return nothing
+end
+
+# the results are written to case_path. With ug2_ibr the generator UG2 is replaced by an IBR
 function ieee14_inputs(
     case_path::String;
     perturbations::Vector{<:nsLFT.Perturbation} = nsLFT.Perturbation[],
     generator_model::String = "classic",
     gov::Bool = false,
     avr::Bool = false,
+    ug2_ibr::Bool = false,
 )
+    buses = ieee14_buses()
+    generators = ieee14_generators(generator_model, gov, avr)
+    ibrs = nsLFT.IBR[]
+    if ug2_ibr
+        replace_ug2_with_ibr!(buses, generators, ibrs)
+    end
     return nsLFT.Inputs(;
         case_path = case_path,
         Sb = 100.0,
@@ -526,9 +592,10 @@ function ieee14_inputs(
         integration_step = 0.01,
         simulation_horizon = 10.0,
         tolerance = 1e-10,
-        buses = ieee14_buses(),
+        buses = buses,
         circuits = ieee14_circuits(),
-        generators = ieee14_generators(generator_model, gov, avr),
+        generators = generators,
+        ibrs = ibrs,
         loads = ieee14_loads(),
         perturbations = perturbations,
     )
