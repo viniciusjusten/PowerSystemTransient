@@ -124,7 +124,8 @@ function generator_current_dq(inputs::Inputs, results::Results, generator::Class
     return Idq
 end
 
-function generator_current_network_contribution(inputs::Inputs, results::Results, generator::ClassicGenerator, state::ClassicGeneratorState, ts::Int)
+# results is not used here, but the OneDOneQ method needs the bus voltage and both are called the same way
+function generator_current_network_contribution(inputs::Inputs, ::Results, generator::ClassicGenerator, state::ClassicGeneratorState, ts::Int)
     E = state.Eq_prime * cis(state.delta[ts])
     I = E * generator_admittance(inputs, generator)
     return I
@@ -199,7 +200,7 @@ function electrical_power(
 end
 
 # terminal voltage of the generator is the voltage at the bus to which it is connected
-function terminal_voltage(inputs::Inputs, generator::Generator, results::Results, ts::Int)
+function terminal_voltage(generator::Generator, results::Results, ts::Int)
     bus_idx = generator_bus(generator)
     Vr = results.bus[bus_idx].Vr[ts]
     Vi = results.bus[bus_idx].Vi[ts]

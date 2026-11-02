@@ -50,8 +50,6 @@ function step_Pmec_1!(
 end
 
 function deriv_Pmec(
-    inputs::Inputs,
-    generator::Generator,
     governor::Droop1stOrder,
     governor_state::Droop1stOrderState,
     state::GeneratorState,
@@ -64,7 +62,6 @@ end
 
 function predict_Pmec!(
     inputs::Inputs,
-    generator::Generator,
     governor::Droop1stOrder,
     governor_state::Droop1stOrderState,
     state::GeneratorState,
@@ -73,13 +70,12 @@ function predict_Pmec!(
     # predict the next Pmec value using the Euler method
     state.Pmec[ts+1] =
         state.Pmec[ts] +
-        integration_step(inputs) * deriv_Pmec(inputs, generator, governor, governor_state, state, ts)
+        integration_step(inputs) * deriv_Pmec(governor, governor_state, state, ts)
     return nothing
 end
 
 function step_Pmec!(
     inputs::Inputs,
-    generator::Generator,
     governor::Droop1stOrder,
     governor_state::Droop1stOrderState,
     state::GeneratorState,
@@ -89,8 +85,8 @@ function step_Pmec!(
     state.Pmec[ts+1] =
         state.Pmec[ts] +
         integration_step(inputs) / 2 * (
-            deriv_Pmec(inputs, generator, governor, governor_state, state, ts) +
-            deriv_Pmec(inputs, generator, governor, governor_state, state, ts+1)
+            deriv_Pmec(governor, governor_state, state, ts) +
+            deriv_Pmec(governor, governor_state, state, ts+1)
         )
     return nothing
 end
@@ -104,12 +100,12 @@ function step_Pmec_1!(::Inputs, ::Generator, ::Nothing, ::Nothing, ::GeneratorSt
     return nothing
 end
 
-function predict_Pmec!(::Inputs, ::Generator, ::Nothing, ::Nothing, state::GeneratorState, ts::Int)
+function predict_Pmec!(::Inputs, ::Nothing, ::Nothing, state::GeneratorState, ts::Int)
     state.Pmec[ts+1] = state.Pmec[ts]
     return nothing
 end
 
-function step_Pmec!(::Inputs, ::Generator, ::Nothing, ::Nothing, state::GeneratorState, ts::Int)
+function step_Pmec!(::Inputs, ::Nothing, ::Nothing, state::GeneratorState, ts::Int)
     state.Pmec[ts+1] = state.Pmec[ts]
     return nothing
 end

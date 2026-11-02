@@ -101,7 +101,7 @@ function solve_network!(inputs::Inputs, results::Results, ts::Int)
     # the currents come first because the electrical power of the OneDOneQ generator is computed from them
     for (generator, state) in zip(inputs.generators, results.generator)
         state.id[ts], state.iq[ts] = generator_current_dq(inputs, results, generator, state, ts)
-        state.Vt[ts] = terminal_voltage(inputs, generator, results, ts)
+        state.Vt[ts] = terminal_voltage(generator, results, ts)
         state.Pele[ts] = electrical_power(inputs, results, generator, state, ts)
     end
 

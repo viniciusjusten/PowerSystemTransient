@@ -22,7 +22,6 @@ end
 
 function predict_efd!(
     inputs::Inputs,
-    generator::Generator,
     voltage_regulator::Static1stOrder,
     voltage_regulator_state::Static1stOrderState,
     state::GeneratorState,
@@ -38,7 +37,6 @@ end
 
 function step_efd!(
     inputs::Inputs,
-    generator::Generator,
     voltage_regulator::Static1stOrder,
     voltage_regulator_state::Static1stOrderState,
     state::GeneratorState,
@@ -55,21 +53,22 @@ function step_efd!(
     return nothing
 end
 
-# without a voltage regulator the field voltage stays constant
-function predict_efd!(::Inputs, ::ClassicGenerator, ::Nothing, ::Nothing, ::GeneratorState, ::Int)
+# without a voltage regulator the field voltage stays constant. The methods dispatch on the generator state, since only
+# the OneDOneQ state holds efd
+function predict_efd!(::Inputs, ::Nothing, ::Nothing, ::ClassicGeneratorState, ::Int)
     return nothing
 end
 
-function step_efd!(::Inputs, ::ClassicGenerator, ::Nothing, ::Nothing, ::GeneratorState, ::Int)
+function step_efd!(::Inputs, ::Nothing, ::Nothing, ::ClassicGeneratorState, ::Int)
     return nothing
 end
 
-function predict_efd!(::Inputs, ::OneDOneQGenerator, ::Nothing, ::Nothing, state::GeneratorState, ts::Int)
+function predict_efd!(::Inputs, ::Nothing, ::Nothing, state::OneDOneQGeneratorState, ts::Int)
     state.efd[ts+1] = state.efd[ts]
     return nothing
 end
 
-function step_efd!(::Inputs, ::OneDOneQGenerator, ::Nothing, ::Nothing, state::GeneratorState, ts::Int)
+function step_efd!(::Inputs, ::Nothing, ::Nothing, state::OneDOneQGeneratorState, ts::Int)
     state.efd[ts+1] = state.efd[ts]
     return nothing
 end

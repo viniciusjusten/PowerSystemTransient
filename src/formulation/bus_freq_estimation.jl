@@ -13,7 +13,6 @@ function deriv_freq_estim_x_theta(
 end
 
 function deriv_freq_estim_omega(
-    inputs::Inputs,
     bus_freq_estimation::FilteredAngleDerivative,
     bus_freq_estimation_state::FilteredAngleDerivativeState,
     ts::Int,
@@ -51,7 +50,7 @@ function predict_bus_freq_estimation!(
     end
 
     deriv_x_theta = deriv_freq_estim_x_theta(inputs, bus_freq_estimation, bus_freq_estimation_state, ts)
-    deriv_omega = deriv_freq_estim_omega(inputs, bus_freq_estimation, bus_freq_estimation_state, ts)
+    deriv_omega = deriv_freq_estim_omega(bus_freq_estimation, bus_freq_estimation_state, ts)
 
     bus_freq_estimation_state.theta_estim[ts+1] =
         continuous_bus_angle(bus_state, bus_freq_estimation_state, ts+1)
@@ -79,7 +78,7 @@ function step_bus_freq_estimation!(
     ts::Int,
 )
     deriv_x_theta = deriv_freq_estim_x_theta(inputs, bus_freq_estimation, bus_freq_estimation_state, ts)
-    deriv_omega = deriv_freq_estim_omega(inputs, bus_freq_estimation, bus_freq_estimation_state, ts)
+    deriv_omega = deriv_freq_estim_omega(bus_freq_estimation, bus_freq_estimation_state, ts)
 
     bus_freq_estimation_state.theta_estim[ts+1] =
         continuous_bus_angle(bus_state, bus_freq_estimation_state, ts+1)
@@ -99,7 +98,7 @@ function step_bus_freq_estimation!(
         bus_freq_estimation_state.omega[ts] +
         integration_step(inputs) / 2 * (
             deriv_omega +
-            deriv_freq_estim_omega(inputs, bus_freq_estimation, bus_freq_estimation_state, ts+1)
+            deriv_freq_estim_omega(bus_freq_estimation, bus_freq_estimation_state, ts+1)
         )
 
     return nothing

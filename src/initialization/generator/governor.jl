@@ -1,4 +1,4 @@
-function initialize_mechanical_power!(::Generator, state::GeneratorState)
+function initialize_mechanical_power!(state::GeneratorState)
     state.Pmec .= state.Pele[1]
     return nothing
 end
@@ -26,7 +26,7 @@ end
 
 function initialize_mechanical_powers!(inputs::Inputs, results::Results)
     for (generator, state) in zip(inputs.generators, results.generator)
-        initialize_mechanical_power!(generator, state)
+        initialize_mechanical_power!(state)
         initialize_governor!(inputs, generator, generator_governor(generator), state.governor, state)
     end
     return nothing

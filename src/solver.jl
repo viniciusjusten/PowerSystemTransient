@@ -176,12 +176,12 @@ function step!(inputs::Inputs, results::Results, ts::Int)
         predict_omega!(inputs, generator, state, ts)
         predict_delta!(inputs, state, ts)
         predict_Pmec_1!(inputs, generator, governor, state.governor, state, ts)
-        predict_Pmec!(inputs, generator, governor, state.governor, state, ts)
+        predict_Pmec!(inputs, governor, state.governor, state, ts)
         if generator isa OneDOneQGenerator
             predict_ed_prime!(inputs, generator, state, ts)
             predict_eq_prime!(inputs, generator, state, ts)
         end
-        predict_efd!(inputs, generator, voltage_regulator, state.voltage_regulator, state, ts)
+        predict_efd!(inputs, voltage_regulator, state.voltage_regulator, state, ts)
     end
     for (bus, bus_state) in zip(inputs.buses, results.bus)
         freq_estimation = bus_freq_estimation(bus)
@@ -205,12 +205,12 @@ function step!(inputs::Inputs, results::Results, ts::Int)
             step_omega!(inputs, generator, state, ts)
             step_delta!(inputs, state, ts)
             step_Pmec_1!(inputs, generator, governor, state.governor, state, ts)
-            step_Pmec!(inputs, generator, governor, state.governor, state, ts)
+            step_Pmec!(inputs, governor, state.governor, state, ts)
             if generator isa OneDOneQGenerator
                 step_ed_prime!(inputs, generator, state, ts)
                 step_eq_prime!(inputs, generator, state, ts)
             end
-            step_efd!(inputs, generator, voltage_regulator, state.voltage_regulator, state, ts)
+            step_efd!(inputs, voltage_regulator, state.voltage_regulator, state, ts)
         end
         for (bus, bus_state) in zip(inputs.buses, results.bus)
             freq_estimation = bus_freq_estimation(bus)
