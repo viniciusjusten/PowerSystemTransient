@@ -171,17 +171,7 @@ function step!(inputs::Inputs, results::Results, ts::Int)
 
     predict_voltages!(results, ts)
     for (generator, state) in zip(inputs.generators, results.generator)
-        governor = generator_governor(generator)
-        voltage_regulator = generator_voltage_regulator(generator)
-        predict_omega!(inputs, generator, state, ts)
-        predict_delta!(inputs, state, ts)
-        predict_Pmec_1!(inputs, generator, governor, state.governor, state, ts)
-        predict_Pmec!(inputs, governor, state.governor, state, ts)
-        if generator isa OneDOneQGenerator
-            predict_ed_prime!(inputs, generator, state, ts)
-            predict_eq_prime!(inputs, generator, state, ts)
-        end
-        predict_efd!(inputs, voltage_regulator, state.voltage_regulator, state, ts)
+        predict_generator!(inputs, generator, state, ts)
     end
     for (bus, bus_state) in zip(inputs.buses, results.bus)
         freq_estimation = bus_freq_estimation(bus)
@@ -190,9 +180,7 @@ function step!(inputs::Inputs, results::Results, ts::Int)
     for (ibr, state) in zip(inputs.ibrs, results.ibr)
         bus_idx = ibr_bus(ibr)
         freq_estimation_state = results.bus[bus_idx].freq_estimation
-        predict_active_power_control!(inputs, ibr, state, freq_estimation_state, ts)
-        predict_reactive_power_control!(inputs, ibr, state, ts)
-        predict_converter!(inputs, ibr, state, ts)
+        predict_ibr!(inputs, ibr, state, freq_estimation_state, ts)
     end
     solve_network!(inputs, results, ts + 1) # V[ts+1] and Pele[ts+1] from the predicted states
 
@@ -200,30 +188,17 @@ function step!(inputs::Inputs, results::Results, ts::Int)
         cache_step!(inputs, results, ts, caches) # delta, omega, Vr and Vi at ts+1
 
         for (generator, state) in zip(inputs.generators, results.generator)
-            governor = generator_governor(generator)
-            voltage_regulator = generator_voltage_regulator(generator)
-            step_omega!(inputs, generator, state, ts)
-            step_delta!(inputs, state, ts)
-            step_Pmec_1!(inputs, generator, governor, state.governor, state, ts)
-            step_Pmec!(inputs, governor, state.governor, state, ts)
-            if generator isa OneDOneQGenerator
-                step_ed_prime!(inputs, generator, state, ts)
-                step_eq_prime!(inputs, generator, state, ts)
-            end
-            step_efd!(inputs, voltage_regulator, state.voltage_regulator, state, ts)
+            step_generator!(inputs, generator, state, ts)
         end
         for (bus, bus_state) in zip(inputs.buses, results.bus)
             freq_estimation = bus_freq_estimation(bus)
             step_bus_freq_estimation!(inputs, freq_estimation, bus_state.freq_estimation, bus_state, ts)
         end
-        # the IBR controls take omega at ts + 1 from the frequency estimation of their bus, so they come after it, and
-        # the converter takes Pref and Qref at ts + 1 from the controls
+        # the IBR controls take omega at ts + 1 from the frequency estimation of their bus, so they come after it
         for (ibr, state) in zip(inputs.ibrs, results.ibr)
             bus_idx = ibr_bus(ibr)
             freq_estimation_state = results.bus[bus_idx].freq_estimation
-            step_active_power_control!(inputs, ibr, state, freq_estimation_state, ts)
-            step_reactive_power_control!(inputs, ibr, state, ts)
-            step_converter!(inputs, ibr, state, ts)
+            step_ibr!(inputs, ibr, state, freq_estimation_state, ts)
         end
         solve_network!(inputs, results, ts + 1)
 
