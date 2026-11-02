@@ -38,12 +38,20 @@ function ibr_current_network_contribution(results::Results, ibr::IBR, state::IBR
     return (Ip_ef - im * state.Iq[ts]) * cis(theta)
 end
 
-# Vt, Ip_ef and the powers at the terminal from the network solution at ts
+# Vt, Ip_ef and the powers at the terminal from the network solution at ts. A tripped IBR injects nothing, as the
+# currents and the electrical power of a tripped generator, while its states keep being integrated with the voltage
+# of its bus
 function update_ibr_measurements!(results::Results, ibr::IBR, state::IBRState, ts::Int)
     bus_idx = ibr_bus(ibr)
     bus_state = results.bus[bus_idx]
     V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
     state.Vt[ts] = abs(V)
+    if ibr_tripped(ibr)
+        state.Ip_ef[ts] = 0.0
+        state.Pmed[ts] = 0.0
+        state.Qmed[ts] = 0.0
+        return nothing
+    end
     update_Ip_ef!(ibr, state, ts)
     state.Pmed[ts] = state.Vt[ts] * state.Ip_ef[ts]
     state.Qmed[ts] = state.Vt[ts] * state.Iq[ts]

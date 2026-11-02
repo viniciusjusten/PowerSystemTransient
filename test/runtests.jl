@@ -18,4 +18,5 @@ include(joinpath(@__DIR__, "ieee14_perturbations.jl"))
     include(joinpath("ieee14_one_d_one_q_governor_avr_short_circuit", "ieee14.jl"))
     include(joinpath("ieee14_one_d_one_q_governor_avr_freq_estimation_ug2_trip", "ieee14.jl"))
     include(joinpath("ieee14_one_d_one_q_governor_avr_ibr_short_circuit", "ieee14.jl"))
+    include(joinpath("ieee14_one_d_one_q_governor_avr_ibr_trip", "ieee14.jl"))
 end

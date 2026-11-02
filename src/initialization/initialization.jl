@@ -18,6 +18,9 @@ function reset_element_states!(inputs::Inputs)
     for generator in inputs.generators
         generator.tripped = false
     end
+    for ibr in inputs.ibrs
+        ibr.tripped = false
+    end
     for load in inputs.loads
         load.P = load_P0(load)
         load.Q = load_Q0(load)

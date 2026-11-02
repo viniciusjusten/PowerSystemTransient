@@ -110,6 +110,28 @@ function apply_perturbation!(inputs, perturbation::GeneratorTrip)
     return nothing
 end
 
+mutable struct IBRTrip <: Perturbation
+    name::String
+    ibr_idx::Int # index of the IBR that is tripped
+
+    time::Float64 # instant the IBR is tripped, in s
+end
+
+function IBRTrip(;
+    name::String,
+    ibr_idx::Int,
+    time::Float64,
+)
+    return IBRTrip(name, ibr_idx, time)
+end
+
+perturbation_ibr_idx(perturbation::IBRTrip) = perturbation.ibr_idx
+
+function apply_perturbation!(inputs, perturbation::IBRTrip)
+    inputs.ibrs[perturbation_ibr_idx(perturbation)].tripped = true
+    return nothing
+end
+
 mutable struct LoadChange <: Perturbation
     name::String
     load_idx::Int # index of the load that changes

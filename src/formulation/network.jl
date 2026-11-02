@@ -77,7 +77,7 @@ end
 # solves the network with the generator and IBR states at ts and writes the voltages, currents, electrical powers and
 # IBR measurements at ts
 function solve_network!(inputs::Inputs, results::Results, ts::Int)
-    # The current vector I only includes generators that are in service and the IBRs, loads are included in the Ybus
+    # The current vector I only includes the generators and IBRs that are in service, loads are included in the Ybus
     # matrix
     I = zeros(ComplexF64, num_buses(inputs))
     for (generator, state) in zip(inputs.generators, results.generator)
@@ -86,8 +86,10 @@ function solve_network!(inputs::Inputs, results::Results, ts::Int)
         end
     end
     for (ibr, state) in zip(inputs.ibrs, results.ibr)
-        bus_idx = ibr_bus(ibr)
-        I[bus_idx] += ibr_current_network_contribution(results, ibr, state, ts)
+        if !ibr_tripped(ibr)
+            bus_idx = ibr_bus(ibr)
+            I[bus_idx] += ibr_current_network_contribution(results, ibr, state, ts)
+        end
     end
     V = inputs.Ybus_lu \ I
 
