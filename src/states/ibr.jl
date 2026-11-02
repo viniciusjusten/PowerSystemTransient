@@ -17,11 +17,27 @@ mutable struct IBRState
     yq::Vector{Float64} # integral part of the voltage PI, the state of its integrator, in pu
     Qext::Vector{Float64} # output of the voltage PI after the limits, in pu
     Qref::Vector{Float64} # reactive power reference, the output of the lag 1 / (1 + s Tq), in pu
+
+    # Current logic
+    iq_inj::Vector{Float64} # reactive current injection during the voltage dip, in pu
+    Ip_cmd_pre::Vector{Float64} # active current command before the current limit, Pref / Vt, in pu
+    Iq_cmd_pre::Vector{Float64} # reactive current command before the current limit, iq_inj + Qref / Vt, in pu
+    Ip_max::Vector{Float64} # upper limit of the active current command, in pu
+    Iq_max::Vector{Float64} # limit of the magnitude of the reactive current command, in pu
+    Ip_cmd::Vector{Float64} # active current command after the current limit, in pu
+    Iq_cmd::Vector{Float64} # reactive current command after the current limit, in pu
 end
 
 function IBRState(num_steps::Int)
     # NaN keeps a step not yet computed from passing a convergence check by accident
     return IBRState(
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
         fill(NaN, num_steps),
         fill(NaN, num_steps),
         fill(NaN, num_steps),

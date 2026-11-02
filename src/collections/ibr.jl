@@ -1,4 +1,11 @@
 
+# Current that keeps its reference when Ip and Iq together reach Imax, while the other one is limited by what is left,
+# sqrt(Imax^2 - I^2). The values are the opposite of PQFLAG of WECC REEC_B, where 0 is the Q priority
+@enumx CurrentPriority begin
+    P = 0
+    Q = 1
+end
+
 # Grid following IBR simplified from WECC REPC_A, REEC_B and REGC_A, keeping the plant control PIs so the steady state
 # error of the active power and of the voltage droop characteristic is zero. Ip is in phase with the terminal voltage
 # and Iq > 0 injects reactive power, so P = Vt * Ip and Q = Vt * Iq. The frequency comes from the frequency estimation
@@ -28,12 +35,13 @@ mutable struct IBR
     Tq::Float64 # time constant of the reactive power reference, in s
     Vfrz::Float64 # terminal voltage below which the voltage PI integrator freezes, in pu
 
-    # Electrical control
-    Vdip::Float64 # terminal voltage below which the reactive current injection and the Q priority act, in pu
+    # Current logic
+    Vdip::Float64 # terminal voltage below which the reactive current injection acts and the active power PI integrator freezes, in pu
     Kqv::Float64 # gain of the reactive current injection, in pu/pu
     Iqh1::Float64 # upper limit of the reactive current injection, in pu
     Iql1::Float64 # lower limit of the reactive current injection, in pu
     Imax::Float64 # maximum converter current, in pu
+    priority::CurrentPriority.T # current that keeps its reference at the Imax limit, P or Q
 
     # Converter
     Tg::Float64 # time constant of the current controls, in s
@@ -68,6 +76,7 @@ function IBR(;
     Iqh1::Float64,
     Iql1::Float64,
     Imax::Float64,
+    priority::CurrentPriority.T,
     Tg::Float64,
     lv0::Float64,
     lv1::Float64,
@@ -97,6 +106,7 @@ function IBR(;
         Iqh1,
         Iql1,
         Imax,
+        priority,
         Tg,
         lv0,
         lv1,
@@ -152,6 +162,8 @@ ibr_Iqh1(inputs, ibr::IBR) = ibr.Iqh1 * ibr_Sn(ibr) / Sb(inputs)
 ibr_Iql1(inputs, ibr::IBR) = ibr.Iql1 * ibr_Sn(ibr) / Sb(inputs)
 
 ibr_Imax(inputs, ibr::IBR) = ibr.Imax * ibr_Sn(ibr) / Sb(inputs)
+
+ibr_priority(ibr::IBR) = ibr.priority
 
 ibr_Tg(ibr::IBR) = ibr.Tg
 

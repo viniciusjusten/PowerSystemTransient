@@ -1,5 +1,6 @@
 module nsLFT
 
+using EnumX
 using LinearAlgebra
 using SparseArrays
 
@@ -35,8 +36,8 @@ include("formulation/generator/voltage_regulator.jl")
 include("formulation/bus_freq_estimation.jl")
 include("formulation/ibr/active_power.jl")
 include("formulation/ibr/reactive_power.jl")
-include("formulation/ibr/electrical.jl")
-include("formulation/ibr/inverter.jl")
+include("formulation/ibr/current_logic.jl")
+include("formulation/ibr/converter.jl")
 
 include("initialization/generator/generator.jl")
 include("initialization/generator/governor.jl")
@@ -44,8 +45,8 @@ include("initialization/generator/voltage_regulator.jl")
 include("initialization/bus_freq_estimation.jl")
 include("initialization/ibr/active_power.jl")
 include("initialization/ibr/reactive_power.jl")
-include("initialization/ibr/electrical.jl")
-include("initialization/ibr/inverter.jl")
+include("initialization/ibr/current_logic.jl")
+include("initialization/ibr/converter.jl")
 include("initialization/initialization.jl")
 
 include("solver.jl")
