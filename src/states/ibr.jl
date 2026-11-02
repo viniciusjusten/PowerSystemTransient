@@ -26,11 +26,19 @@ mutable struct IBRState
     Iq_max::Vector{Float64} # limit of the magnitude of the reactive current command, in pu
     Ip_cmd::Vector{Float64} # active current command after the current limit, in pu
     Iq_cmd::Vector{Float64} # reactive current command after the current limit, in pu
+
+    # Converter
+    Ip::Vector{Float64} # active current, the output of the lag 1 / (1 + s Tg) with the rise limited by Rrpwr, in pu
+    Iq::Vector{Float64} # reactive current, the output of the lag 1 / (1 + s Tg), in pu
+    Ip_ef::Vector{Float64} # active current injected in the network, Ip times the low voltage gain, in pu
 end
 
 function IBRState(num_steps::Int)
     # NaN keeps a step not yet computed from passing a convergence check by accident
     return IBRState(
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
+        fill(NaN, num_steps),
         fill(NaN, num_steps),
         fill(NaN, num_steps),
         fill(NaN, num_steps),

@@ -45,6 +45,7 @@ mutable struct IBR
 
     # Converter
     Tg::Float64 # time constant of the current controls, in s
+    Rrpwr::Float64 # upper limit of the rate of rise of the active current, in pu/s
     lv0::Float64 # terminal voltage below which the low voltage gain of the active current is zero, in pu
     lv1::Float64 # terminal voltage above which the low voltage gain of the active current is one, in pu
 
@@ -78,6 +79,7 @@ function IBR(;
     Imax::Float64,
     priority::CurrentPriority.T,
     Tg::Float64,
+    Rrpwr::Float64,
     lv0::Float64,
     lv1::Float64,
     P0::Float64,
@@ -108,6 +110,7 @@ function IBR(;
         Imax,
         priority,
         Tg,
+        Rrpwr,
         lv0,
         lv1,
         P0,
@@ -124,7 +127,7 @@ ibr_Sn(ibr::IBR) = ibr.Sn
 ibr_battery(ibr::IBR) = ibr.battery
 
 # The powers, currents and gains are given in the IBR base and returned in the system base. Powers and currents scale
-# by Sn / Sb, since the voltage base is the same. The gains scale like the ratio of their output to their input, so
+# by Sn / Sb, since the voltage base is the same, and so does the rate of rise of the current Rrpwr. The gains scale like the ratio of their output to their input, so
 # D, Kp, Ki and Kqv, which turn a frequency or a voltage into a power or a current, scale by Sn / Sb, Kc, which turns
 # a reactive power into a voltage, scales by Sb / Sn, and Kpg and Kig, from power to power, do not change
 ibr_D(inputs, ibr::IBR) = ibr.D * ibr_Sn(ibr) / Sb(inputs)
@@ -166,6 +169,8 @@ ibr_Imax(inputs, ibr::IBR) = ibr.Imax * ibr_Sn(ibr) / Sb(inputs)
 ibr_priority(ibr::IBR) = ibr.priority
 
 ibr_Tg(ibr::IBR) = ibr.Tg
+
+ibr_Rrpwr(inputs, ibr::IBR) = ibr.Rrpwr * ibr_Sn(ibr) / Sb(inputs)
 
 ibr_lv0(ibr::IBR) = ibr.lv0
 

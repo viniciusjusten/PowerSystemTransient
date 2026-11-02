@@ -3,13 +3,14 @@
 # is not a battery, the active current must not be negative. Pref and Qref at t = 0 come from the active and reactive
 # power controls, so they must be initialized before
 function initialize_current_logic!(inputs::Inputs, ibr::IBR, state::IBRState)
-    Vt = state.Vt[1]
-    Vdip = ibr_Vdip(ibr)
-    if Vt < Vdip
+    if in_voltage_dip(ibr, state, 1)
+        Vt = state.Vt[1]
+        Vdip = ibr_Vdip(ibr)
         error("Initial terminal voltage of the IBR $(ibr_name(ibr)) (Vt = $Vt) is below the voltage dip threshold (Vdip = $Vdip)")
     end
 
-    update_current_logic!(inputs, ibr, state, 1)
+    # outside the voltage dip, as checked above
+    update_current_logic!(inputs, ibr, state, 1, false)
 
     Ip = state.Ip_cmd_pre[1]
     Iq = state.Iq_cmd_pre[1]

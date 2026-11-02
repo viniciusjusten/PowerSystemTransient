@@ -39,7 +39,7 @@ function yp_frozen(
     freq_estimation_state::BusFreqEstimationState,
     ts::Int,
 )
-    if state.Vt[ts] < ibr_Vdip(ibr)
+    if in_voltage_dip(ibr, state, ts)
         return true
     end
     ep = active_power_error(inputs, ibr, state, freq_estimation_state, ts)

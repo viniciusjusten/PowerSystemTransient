@@ -1,10 +1,16 @@
-# Current logic simplified from WECC REEC_B. All the values are algebraic, functions of Vt at ts and of the states Pref
-# and Qref at ts, so they are updated after the network solution at ts
+# Current logic simplified from WECC REEC_B. All the values are algebraic, functions of Vt and of the states Pref and
+# Qref at the same instant. The converter updates them at ts in predict and at ts + 1 in the step, after the controls
+# and the previous network solution, with the voltage dip status decided at ts
 
-# During the voltage dip, Vt < Vdip, the IBR injects a reactive current proportional to the voltage drop from the
-# power flow solution, to support the voltage during the fault
-function reactive_current_injection(inputs::Inputs, ibr::IBR, state::IBRState, ts::Int)
-    if state.Vt[ts] < ibr_Vdip(ibr)
+function in_voltage_dip(ibr::IBR, state::IBRState, ts::Int)
+    return state.Vt[ts] < ibr_Vdip(ibr)
+end
+
+# During the voltage dip the IBR injects a reactive current proportional to the voltage drop from the power flow
+# solution, to support the voltage during the fault. The dip status comes from the caller, since the converter decides
+# it at ts for the whole step
+function reactive_current_injection(inputs::Inputs, ibr::IBR, state::IBRState, ts::Int, voltage_dip::Bool)
+    if voltage_dip
         bus_idx = ibr_bus(ibr)
         bus = get_bus(inputs, bus_idx)
         V0 = bus_voltage(bus)
@@ -29,8 +35,8 @@ function limit_Iq_cmd!(state::IBRState, ts::Int)
     return nothing
 end
 
-function update_current_logic!(inputs::Inputs, ibr::IBR, state::IBRState, ts::Int)
-    state.iq_inj[ts] = reactive_current_injection(inputs, ibr, state, ts)
+function update_current_logic!(inputs::Inputs, ibr::IBR, state::IBRState, ts::Int, voltage_dip::Bool)
+    state.iq_inj[ts] = reactive_current_injection(inputs, ibr, state, ts, voltage_dip)
 
     # the floor on the voltage keeps a bolted fault at the terminal from dividing by zero
     Vt = max(state.Vt[ts], 1e-3)
