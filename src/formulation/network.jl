@@ -54,8 +54,10 @@ function admittance_matrix(inputs::Inputs)
 end
 
 function initialize_Ybus!(inputs::Inputs)
-    inputs.Ybus_cache = admittance_matrix(inputs)
-    inputs.Ybus_lu = lu(inputs.Ybus_cache)
+    network = get_network(inputs)
+    Ybus = admittance_matrix(inputs)
+    network.Ybus_cache = Ybus
+    network.Ybus_lu = lu(Ybus)
     return nothing
 end
 
@@ -68,8 +70,11 @@ function cache_Ybus!(inputs::Inputs, ts::Int)
     if isempty(current_perturbations)
         return false
     end
-    inputs.Ybus_cache = admittance_matrix(inputs)
-    lu!(inputs.Ybus_lu, inputs.Ybus_cache)
+    network = get_network(inputs)
+    Ybus = admittance_matrix(inputs)
+    network.Ybus_cache = Ybus
+    Ybus_lu = network_Ybus_lu(network)
+    lu!(Ybus_lu, Ybus)
 
     return true
 end
@@ -91,7 +96,9 @@ function solve_network!(inputs::Inputs, results::Results, ts::Int)
             I[bus_idx] += ibr_current_network_contribution(results, ibr, state, ts)
         end
     end
-    V = inputs.Ybus_lu \ I
+    network = get_network(inputs)
+    Ybus_lu = network_Ybus_lu(network)
+    V = Ybus_lu \ I
 
     for (bus_idx, state) in enumerate(results.bus)
         state.Vr[ts] = real(V[bus_idx])

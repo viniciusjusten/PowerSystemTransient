@@ -15,6 +15,7 @@ include("collections/generator/generator.jl")
 include("collections/ibr.jl")
 include("collections/load.jl")
 include("collections/perturbation.jl")
+include("collections/network.jl")
 
 include("states/control.jl")
 include("states/bus_freq_estimation.jl")

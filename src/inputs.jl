@@ -16,8 +16,7 @@ mutable struct Inputs
     loads::Vector{Load}
     perturbations::Vector{Perturbation}
 
-    Ybus_cache::SparseMatrixCSC{ComplexF64, Int} # admittance matrix of the current state of the elements, rebuilt at each event
-    Ybus_lu::Union{Nothing, SparseArrays.UMFPACK.UmfpackLU{ComplexF64, Int}} # LU factorization of Ybus_cache, refactored at each event
+    network::Network # representation of the network and its cached matrices
 end
 
 function Inputs(;
@@ -36,8 +35,7 @@ function Inputs(;
     generators::Vector{<:Generator} = Generator[],
     loads::Vector{<:Load} = Load[],
     perturbations::Vector{<:Perturbation} = Perturbation[],
-    Ybus_cache::SparseMatrixCSC{ComplexF64, Int} = spzeros(ComplexF64, 0, 0),
-    Ybus_lu::Union{Nothing, SparseArrays.UMFPACK.UmfpackLU{ComplexF64, Int}} = nothing,
+    network::Network = NetworkRMS(),
 )
     return Inputs(
         case_path,
@@ -53,8 +51,7 @@ function Inputs(;
         ibrs,
         loads,
         perturbations,
-        Ybus_cache,
-        Ybus_lu,
+        network,
     )
 end
 
@@ -87,9 +84,7 @@ function time_index(inputs::Inputs, time::Float64)
     return round(Int, time / integration_step(inputs)) + 1
 end
 
-Ybus_cache(inputs::Inputs) = inputs.Ybus_cache
-
-Ybus_lu(inputs::Inputs) = inputs.Ybus_lu
+get_network(inputs::Inputs) = inputs.network
 
 get_bus(inputs::Inputs, idx::Int) = inputs.buses[idx]
 
