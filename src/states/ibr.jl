@@ -3,7 +3,7 @@ mutable struct IBRState
     Vt::Vector{Float64} # terminal voltage magnitude, in pu
 
     # Active power control
-    Pset::Vector{Float64} # active power setpoint, the power the IBR injects in the network of nsLFT at t = 0, in pu
+    Pset::Vector{Float64} # active power setpoint, the power the IBR injects in the network of PowerSystemTransient at t = 0, in pu
     Pmed::Vector{Float64} # active power injected at the terminal, Vt * Ip, in pu
     xp::Vector{Float64} # proportional part of the active power PI, in pu
     yp::Vector{Float64} # integral part of the active power PI, the state of its integrator, in pu

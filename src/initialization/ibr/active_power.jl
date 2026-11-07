@@ -11,10 +11,10 @@ function validate_ibr_freq_estimations(inputs::Inputs)
     return nothing
 end
 
-# The setpoint is the power the IBR injects in the network of nsLFT at t = 0, rather than P0 of the power flow, which
-# the network only reproduces to the precision of the case data. So Pmed at t = 0 must come from the network solution,
-# which needs the converter initialized before it. With f = 1 and Pset = Pmed the error is zero, so xp = 0 and the
-# integrator holds the whole output, yp = Pset, which gives Pext = Pref = Pset
+# The setpoint is the power the IBR injects in the network of PowerSystemTransient at t = 0, rather than P0 of the
+# power flow, which the network only reproduces to the precision of the case data. So Pmed at t = 0 must come from the
+# network solution, which needs the converter initialized before it. With f = 1 and Pset = Pmed the error is zero, so
+# xp = 0 and the integrator holds the whole output, yp = Pset, which gives Pext = Pref = Pset
 function initialize_active_power_control!(inputs::Inputs, ibr::IBR, state::IBRState)
     Pset = state.Pmed[1]
     Pmin = ibr_Pmin(inputs, ibr)

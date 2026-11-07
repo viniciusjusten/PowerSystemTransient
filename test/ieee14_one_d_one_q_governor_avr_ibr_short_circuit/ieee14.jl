@@ -8,7 +8,7 @@
         avr = true,
         ug2_ibr = true,
     )
-    results = nsLFT.solve(inputs)
+    results = PST.solve(inputs)
 
     # every trajectory, including those of the IBR, matches the one stored in the reference file
     test_trajectories(inputs, results, joinpath(@__DIR__, "reference", "trajectories.csv"))

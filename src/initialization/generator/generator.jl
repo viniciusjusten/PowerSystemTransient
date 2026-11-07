@@ -16,7 +16,7 @@ function initialize_generator!(inputs::Inputs, generator::OneDOneQGenerator, sta
     # TODO: The power flow is read from the case data with a limited number of digits, so the network solved at
     # t = 0 does not reproduce V0 and I0 exactly. As a result, the derivatives of ed_prime and eq_prime at t = 0
     # are about 1e-8 instead of zero, and the operating point drifts slowly without any perturbation.
-    # Solving the power flow inside nsLFT, or reading it with more digits, would remove this drift
+    # Solving the power flow inside PowerSystemTransient, or reading it with more digits, would remove this drift
     bus = get_bus(inputs, generator_bus(generator))
     V0 = bus_voltage(bus) * cis(bus_angle(bus))
     S0 = generator_P0(generator) + im * generator_Q0(generator)

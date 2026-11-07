@@ -7,17 +7,17 @@
         gov = true,
         avr = true,
     )
-    synchronous_results = nsLFT.solve(synchronous_inputs)
+    synchronous_results = PST.solve(synchronous_inputs)
 
     ibr_inputs = ieee14_inputs(
         joinpath(@__DIR__, "ibr2_trip");
-        perturbations = nsLFT.Perturbation[nsLFT.IBRTrip(; name = "IBR2 trip", ibr_idx = 1, time = 1.0)],
+        perturbations = PST.Perturbation[PST.IBRTrip(; name = "IBR2 trip", ibr_idx = 1, time = 1.0)],
         generator_model = "one_d_one_q",
         gov = true,
         avr = true,
         ug2_ibr = true,
     )
-    ibr_results = nsLFT.solve(ibr_inputs)
+    ibr_results = PST.solve(ibr_inputs)
 
     # Both cases start from the same power flow and, after the trip, have the same network with UG1, UG3, UG6 and
     # UG8, so every trajectory they have in common is the same. The trajectories of UG2 and of IBR2, and the frequency

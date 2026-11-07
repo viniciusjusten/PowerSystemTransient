@@ -1,4 +1,4 @@
-module nsLFT
+module PowerSystemTransient
 
 using EnumX
 using LinearAlgebra
@@ -57,4 +57,4 @@ include("solver.jl")
 
 greet() = print("Hello World!")
 
-end # module nsLFT
+end # module PowerSystemTransient

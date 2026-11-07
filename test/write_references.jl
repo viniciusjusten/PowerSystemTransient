@@ -6,7 +6,7 @@
 #   julia --project test/write_references.jl ieee14_one_d_one_q_governor_avr_ibr_short_circuit
 
 using Test
-using nsLFT
+import PowerSystemTransient as PST
 
 include(joinpath(@__DIR__, "..", "scripts", "read_csv.jl"))
 include(joinpath(@__DIR__, "..", "scripts", "ieee14.jl"))
@@ -40,12 +40,12 @@ for (case_name, perturbations, generator_model, gov, avr, ug2_ibr) in cases
         avr = avr,
         ug2_ibr = ug2_ibr,
     )
-    results = nsLFT.solve(inputs)
+    results = PST.solve(inputs)
 
     trajectory_names, trajectories = model_trajectories(inputs, results)
-    time = nsLFT.time_values(inputs)
+    time = PST.time_values(inputs)
     reference_path = joinpath(case_path, "reference")
     mkpath(reference_path)
-    nsLFT.write_csv(joinpath(reference_path, "trajectories.csv"), time, trajectory_names, trajectories)
+    PST.write_csv(joinpath(reference_path, "trajectories.csv"), time, trajectory_names, trajectories)
     println("Reference of $case_name written to $reference_path")
 end

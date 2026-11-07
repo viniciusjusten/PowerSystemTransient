@@ -1,6 +1,7 @@
-# As for the active power, the setpoint comes from the network of nsLFT at t = 0 rather than from the power flow, so
-# Vt and Qmed at t = 0 must come from the network solution. Vref is chosen so that the error starts at zero,
-# Vref = Vt + Kc * Qmed, so xq = 0 and the integrator holds the whole output, yq = Qmed, which gives Qext = Qref = Qmed
+# As for the active power, the setpoint comes from the network of PowerSystemTransient at t = 0 rather than from the
+# power flow, so Vt and Qmed at t = 0 must come from the network solution. Vref is chosen so that the error starts
+# at zero, Vref = Vt + Kc * Qmed, so xq = 0 and the integrator holds the whole output, yq = Qmed,
+# which gives Qext = Qref = Qmed
 function initialize_reactive_power_control!(inputs::Inputs, ibr::IBR, state::IBRState)
     Qmed = state.Qmed[1]
     Qmin = ibr_Qmin(inputs, ibr)

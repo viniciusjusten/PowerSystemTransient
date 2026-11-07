@@ -1,12 +1,12 @@
 using Test
-using nsLFT
+import PowerSystemTransient as PST
 
 include(joinpath(@__DIR__, "..", "scripts", "read_csv.jl"))
 include(joinpath(@__DIR__, "..", "scripts", "ieee14.jl"))
 include(joinpath(@__DIR__, "trajectories.jl"))
 include(joinpath(@__DIR__, "ieee14_perturbations.jl"))
 
-@testset "nsLFT" begin
+@testset "PowerSystemTransient" begin
     include(joinpath("ieee14_no_perturbation", "ieee14.jl"))
     include(joinpath("ieee14_ug2_trip", "ieee14.jl"))
     include(joinpath("ieee14_short_circuit", "ieee14.jl"))

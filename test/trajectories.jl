@@ -13,7 +13,7 @@ function add_state_trajectories!(
     state,
 )
     # the time series include those of the control states, such as the governor and the voltage regulator
-    for (field, values) in nsLFT.time_series(state)
+    for (field, values) in PST.time_series(state)
         push!(column_names, "$(class_name)_$(element_name)_$(field)")
         push!(columns, values)
     end
@@ -22,19 +22,19 @@ end
 
 # The trajectories of every time series stored in the generator, IBR and bus states,
 # named as class_element_field, for example generator_UG1_delta
-function model_trajectories(inputs::nsLFT.Inputs, results::nsLFT.Results)
+function model_trajectories(inputs::PST.Inputs, results::PST.Results)
     column_names = String[]
     columns = Vector{Float64}[]
     for (generator, state) in zip(inputs.generators, results.generator)
-        generator_name = nsLFT.generator_name(generator)
+        generator_name = PST.generator_name(generator)
         add_state_trajectories!(column_names, columns, "generator", generator_name, state)
     end
     for (ibr, state) in zip(inputs.ibrs, results.ibr)
-        ibr_name = nsLFT.ibr_name(ibr)
+        ibr_name = PST.ibr_name(ibr)
         add_state_trajectories!(column_names, columns, "ibr", ibr_name, state)
     end
     for (bus, state) in zip(inputs.buses, results.bus)
-        bus_name = nsLFT.bus_name(bus)
+        bus_name = PST.bus_name(bus)
         add_state_trajectories!(column_names, columns, "bus", bus_name, state)
     end
     return column_names, columns
@@ -47,9 +47,9 @@ operating_point_tolerance() = 1e-6
 
 # Before the first perturbation every time series stays at its initial value, whatever the generator model.
 # Half a step of margin keeps the comparison from depending on the rounding of the time values
-function test_initial_operating_point_kept(inputs::nsLFT.Inputs, results::nsLFT.Results, first_event_time::Float64)
-    time = nsLFT.time_values(inputs)
-    margin = nsLFT.integration_step(inputs) / 2
+function test_initial_operating_point_kept(inputs::PST.Inputs, results::PST.Results, first_event_time::Float64)
+    time = PST.time_values(inputs)
+    margin = PST.integration_step(inputs) / 2
     before_event = time .< first_event_time - margin
     names, columns = model_trajectories(inputs, results)
     for (trajectory_name, trajectory) in zip(names, columns)
@@ -75,22 +75,22 @@ end
 # Before the control states had their own structs, every generator kept the governor trajectories Pmec_1 and Pref,
 # which stayed constant when it had no governor. The references written then still have these columns, and a
 # generator without governor no longer produces them
-function trajectories_of_absent_governors(inputs::nsLFT.Inputs)
+function trajectories_of_absent_governors(inputs::PST.Inputs)
     names = String[]
     for generator in inputs.generators
-        if nsLFT.has_governor(generator)
+        if PST.has_governor(generator)
             continue
         end
-        generator_name = nsLFT.generator_name(generator)
+        generator_name = PST.generator_name(generator)
         push!(names, "generator_$(generator_name)_Pmec_1")
         push!(names, "generator_$(generator_name)_Pref")
     end
     return names
 end
 
-function test_trajectories(inputs::nsLFT.Inputs, results::nsLFT.Results, reference_trajectories_path::String)
+function test_trajectories(inputs::PST.Inputs, results::PST.Results, reference_trajectories_path::String)
     # the model trajectories come from the simulation results and the reference trajectories from the fixed CSV file
-    model_time = nsLFT.time_values(inputs)
+    model_time = PST.time_values(inputs)
     model_names, model_columns = model_trajectories(inputs, results)
     reference_names, reference_columns = reference_trajectories(reference_trajectories_path)
 
