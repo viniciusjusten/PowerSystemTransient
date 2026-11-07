@@ -31,7 +31,7 @@ function convergence_values(results::Results, ts::Int)
     return values
 end
 
-function predict_voltages!(results::Results, ts::Int)
+function predict_voltages!(::PhasorNetwork, results::Results, ts::Int)
     # the Norton current of the OneDOneQ generator is computed from the voltage at ts + 1,
     # so the first network solution of the step starts from the voltages at ts
     for state in results.bus
@@ -41,27 +41,34 @@ function predict_voltages!(results::Results, ts::Int)
     return nothing
 end
 
-function bus_voltages_at(results::Results, ts::Int)
+function bus_voltages_at(network::PhasorNetwork, results::Results, ts::Int)
     V = zeros(ComplexF64, num_buses(results))
     for (bus_idx, state) in enumerate(results.bus)
-        V[bus_idx] = state.Vr[ts] + im * state.Vi[ts]
+        V[bus_idx] = bus_voltage_phasor(network, state, ts)
     end
     return V
 end
 
-function apply_perturbations!(inputs::Inputs, results::Results, ts::Int)
-    # a perturbation at ts changes the voltages and electrical powers at that instant, so the network is
-    # solved again at ts and the step to ts + 1 starts from the values after the perturbation.
-    # The states are continuous and keep their values at ts
-    if !cache_Ybus!(inputs, ts)
+function apply_perturbations!(network::Network, inputs::Inputs, results::Results, ts::Int)
+    current_perturbations = perturbations_at(inputs, ts)
+    if isempty(current_perturbations)
         return nothing
     end
-    # the Norton current of the OneDOneQ generator depends on V when Xd' differs from Xq', so the network
+    # the perturbations only change the state of the elements, and the network is rebuilt from that state
+    for perturbation in current_perturbations
+        apply_perturbation!(inputs, perturbation)
+    end
+    rebuild_network!(network, inputs)
+
+    # a perturbation at ts changes the voltages and electrical powers at that instant, so the network is
+    # solved again at ts and the step to ts + 1 starts from the values after the perturbation.
+    # The states are continuous and keep their values at ts.
+    # The Norton current of the OneDOneQ generator depends on V when Xd' differs from Xq', so the network
     # is solved until the voltages stop changing
     for iteration in 1:max_iterations(inputs)
-        V_previous = bus_voltages_at(results, ts)
-        solve_network!(inputs, results, ts)
-        V = bus_voltages_at(results, ts)
+        V_previous = bus_voltages_at(network, results, ts)
+        solve_network!(network, inputs, results, ts)
+        V = bus_voltages_at(network, results, ts)
         if maximum(abs.(V .- V_previous)) < tolerance(inputs)
             return nothing
         end
@@ -71,9 +78,11 @@ end
 
 # advances the simulation from the time index ts to ts + 1
 function step!(inputs::Inputs, results::Results, ts::Int)
-    apply_perturbations!(inputs, results, ts) # update Ybus and the network solution at ts if there are perturbations at this instant
+    network = get_network(inputs)
 
-    predict_voltages!(results, ts)
+    apply_perturbations!(network, inputs, results, ts) # rebuild the network and solve it again at ts if there are perturbations at this instant
+
+    predict_voltages!(network, results, ts)
     for (generator, state) in zip(inputs.generators, results.generator)
         predict_generator!(inputs, generator, state, ts)
     end
@@ -86,7 +95,7 @@ function step!(inputs::Inputs, results::Results, ts::Int)
         freq_estimation_state = results.bus[bus_idx].freq_estimation
         predict_ibr!(inputs, ibr, state, freq_estimation_state, ts)
     end
-    solve_network!(inputs, results, ts + 1) # V[ts+1] and Pele[ts+1] from the predicted states
+    solve_network!(network, inputs, results, ts + 1) # V[ts+1] and Pele[ts+1] from the predicted states
 
     for iteration in 1:max_iterations(inputs)
         previous_values = convergence_values(results, ts + 1) # values at ts + 1 from the previous iteration
@@ -104,7 +113,7 @@ function step!(inputs::Inputs, results::Results, ts::Int)
             freq_estimation_state = results.bus[bus_idx].freq_estimation
             step_ibr!(inputs, ibr, state, freq_estimation_state, ts)
         end
-        solve_network!(inputs, results, ts + 1)
+        solve_network!(network, inputs, results, ts + 1)
 
         # a value not yet computed is NaN, and so is its difference, which keeps the step from converging
         current_values = convergence_values(results, ts + 1)

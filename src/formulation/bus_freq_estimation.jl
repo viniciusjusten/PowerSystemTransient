@@ -24,8 +24,14 @@ end
 
 # the bus voltage angle at ts, taken in the 2 pi interval around the last estimated angle, so it stays continuous
 # when it crosses pi
-function continuous_bus_angle(bus_state::BusState, bus_freq_estimation_state::FilteredAngleDerivativeState, ts::Int)
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+function continuous_bus_angle(
+    inputs::Inputs,
+    bus_state::BusState,
+    bus_freq_estimation_state::FilteredAngleDerivativeState,
+    ts::Int,
+)
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     wrapped_angle = angle(V)
     angle_difference = rem2pi(wrapped_angle - bus_freq_estimation_state.theta_estim[ts-1], RoundNearest)
     return bus_freq_estimation_state.theta_estim[ts-1] + angle_difference
@@ -44,7 +50,7 @@ function predict_bus_freq_estimation!(
     # as a ramp over the first step
     if ts > 1
         bus_freq_estimation_state.theta_estim[ts] =
-            continuous_bus_angle(bus_state, bus_freq_estimation_state, ts)
+            continuous_bus_angle(inputs, bus_state, bus_freq_estimation_state, ts)
         bus_freq_estimation_state.d_omega[ts] =
             deriv_freq_estim_x_theta(inputs, bus_freq_estimation, bus_freq_estimation_state, ts)
     end
@@ -53,7 +59,7 @@ function predict_bus_freq_estimation!(
     deriv_omega = deriv_freq_estim_omega(bus_freq_estimation, bus_freq_estimation_state, ts)
 
     bus_freq_estimation_state.theta_estim[ts+1] =
-        continuous_bus_angle(bus_state, bus_freq_estimation_state, ts+1)
+        continuous_bus_angle(inputs, bus_state, bus_freq_estimation_state, ts+1)
 
     bus_freq_estimation_state.x_theta[ts+1] =
         bus_freq_estimation_state.x_theta[ts] +
@@ -81,7 +87,7 @@ function step_bus_freq_estimation!(
     deriv_omega = deriv_freq_estim_omega(bus_freq_estimation, bus_freq_estimation_state, ts)
 
     bus_freq_estimation_state.theta_estim[ts+1] =
-        continuous_bus_angle(bus_state, bus_freq_estimation_state, ts+1)
+        continuous_bus_angle(inputs, bus_state, bus_freq_estimation_state, ts+1)
 
     bus_freq_estimation_state.x_theta[ts+1] =
         bus_freq_estimation_state.x_theta[ts] +

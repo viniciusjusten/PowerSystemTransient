@@ -1,7 +1,11 @@
 abstract type Network end
 
+# Networks whose bus voltages are complex phasors in the synchronous reference frame. The devices see the same
+# interface in all of them, and only the solution of the network changes
+abstract type PhasorNetwork <: Network end
+
 # Phasor (RMS) representation of the network, solved algebraically as Ybus * V = I at each time step
-mutable struct NetworkRMS <: Network
+mutable struct NetworkRMS <: PhasorNetwork
     # Cache
     Ybus_cache::SparseMatrixCSC{ComplexF64, Int} # admittance matrix of the current state of the elements, rebuilt at each event
     Ybus_lu::Union{Nothing, SparseArrays.UMFPACK.UmfpackLU{ComplexF64, Int}} # LU factorization of Ybus_cache, refactored at each event

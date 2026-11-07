@@ -26,9 +26,9 @@ function step_generator!(inputs::Inputs, generator::Generator, state::GeneratorS
 end
 
 # terminal voltage of the generator is the voltage at the bus to which it is connected
-function terminal_voltage(generator::Generator, results::Results, ts::Int)
-    bus_idx = generator_bus(generator)
-    Vr = results.bus[bus_idx].Vr[ts]
-    Vi = results.bus[bus_idx].Vi[ts]
-    return sqrt(Vr^2 + Vi^2)
+function terminal_voltage(inputs::Inputs, results::Results, generator::Generator, ts::Int)
+    network = get_network(inputs)
+    bus_state = results.bus[generator_bus(generator)]
+    V = bus_voltage_phasor(network, bus_state, ts)
+    return abs(V)
 end

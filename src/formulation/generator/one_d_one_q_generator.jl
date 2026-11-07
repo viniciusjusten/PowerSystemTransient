@@ -66,7 +66,8 @@ function generator_current_dq(inputs::Inputs, results::Results, generator::OneDO
         return [0.0, 0.0]
     end
     bus_state = results.bus[generator_bus(generator)]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     Ra = generator_Ra(inputs, generator)
     Xq_prime = generator_Xq_prime(inputs, generator)
     Xd_prime = generator_Xd_prime(inputs, generator)
@@ -89,7 +90,8 @@ function generator_current_network_contribution(inputs::Inputs, results::Results
     # when Xd' = Xq', and otherwise V comes from the previous network solution and converges with the corrector
     Iri = generator_current(inputs, results, generator, state, ts)
     bus_state = results.bus[generator_bus(generator)]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     return Iri + V * generator_admittance(inputs, generator)
 end
 
@@ -105,7 +107,8 @@ function electrical_power(
         return 0.0
     end
     bus_state = results.bus[generator_bus(generator)]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     Ra = generator_Ra(inputs, generator)
     vd, vq = ri_to_dq(state.delta[ts]) * [real(V); imag(V)]
     Pele = (vq + Ra * state.iq[ts]) * state.iq[ts] + (vd + Ra * state.id[ts]) * state.id[ts]

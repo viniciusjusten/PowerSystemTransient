@@ -27,10 +27,11 @@ end
 # injection depends on Vt, through the low voltage gain, and on its angle theta. Both come from the voltage at ts already
 # in the results, which is the previous network solution of the corrector, the voltage at ts - 1 copied by
 # predict_voltages! in the first solution of a step, or the power flow voltage at t = 0, and converge with the iterations
-function ibr_current_network_contribution(results::Results, ibr::IBR, state::IBRState, ts::Int)
+function ibr_current_network_contribution(inputs::Inputs, results::Results, ibr::IBR, state::IBRState, ts::Int)
     bus_idx = ibr_bus(ibr)
     bus_state = results.bus[bus_idx]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     Vt = abs(V)
     alpha = low_voltage_gain(ibr, Vt)
     Ip_ef = alpha * state.Ip[ts]
@@ -41,10 +42,11 @@ end
 # Vt, Ip_ef and the powers at the terminal from the network solution at ts. A tripped IBR injects nothing, as the
 # currents and the electrical power of a tripped generator, while its states keep being integrated with the voltage
 # of its bus
-function update_ibr_measurements!(results::Results, ibr::IBR, state::IBRState, ts::Int)
+function update_ibr_measurements!(inputs::Inputs, results::Results, ibr::IBR, state::IBRState, ts::Int)
     bus_idx = ibr_bus(ibr)
     bus_state = results.bus[bus_idx]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     state.Vt[ts] = abs(V)
     if ibr_tripped(ibr)
         state.Ip_ef[ts] = 0.0

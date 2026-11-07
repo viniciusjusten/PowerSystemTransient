@@ -4,7 +4,8 @@ function generator_current(inputs::Inputs, results::Results, generator::ClassicG
         return 0.0 + 0.0im
     end
     bus_state = results.bus[generator_bus(generator)]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     E = state.Eq_prime * cis(state.delta[ts])
     I = (E - V) * generator_admittance(inputs, generator)
     return I
@@ -38,7 +39,8 @@ function electrical_power(
         return 0.0
     end
     bus_state = results.bus[generator_bus(generator)]
-    V = bus_state.Vr[ts] + im * bus_state.Vi[ts]
+    network = get_network(inputs)
+    V = bus_voltage_phasor(network, bus_state, ts)
     E = state.Eq_prime * cis(state.delta[ts])
     I = (E - V) * generator_admittance(inputs, generator)
     return real(conj(I) * E)

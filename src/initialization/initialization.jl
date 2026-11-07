@@ -1,4 +1,5 @@
-function initialize_buses!(inputs::Inputs, results::Results)
+# the bus voltages at t = 0 are the phasors of the power flow solution
+function initialize_buses!(::PhasorNetwork, inputs::Inputs, results::Results)
     for (bus, state) in zip(inputs.buses, results.bus)
         V0 = bus_voltage(bus) * cis(bus_angle(bus))
         state.Vr[1] = real(V0)
@@ -52,13 +53,14 @@ function initialization(inputs::Inputs)
     validate_ibr_freq_estimations(inputs)
 
     results = Results(inputs)
+    network = get_network(inputs)
 
     reset_element_states!(inputs)
-    initialize_buses!(inputs, results)
+    initialize_buses!(network, inputs, results)
     initialize_generators!(inputs, results)
     initialize_ibr_converters_from_power_flow!(inputs, results)
-    initialize_Ybus!(inputs)
-    solve_network!(inputs, results, 1) # V, Pele, Pmed and Qmed at t = 0 from the initial states
+    initialize_network!(network, inputs)
+    solve_network!(network, inputs, results, 1) # V, Pele, Pmed and Qmed at t = 0 from the initial states
     initialize_mechanical_powers!(inputs, results)
     initialize_voltage_regulators!(inputs, results)
     initialize_bus_freq_estimations!(inputs, results)

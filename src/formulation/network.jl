@@ -3,7 +3,7 @@ function admittance(resistance::Float64, reactance::Float64)
 end
 
 # builds the admittance matrix from the current state of the elements, including generators and loads
-function admittance_matrix(inputs::Inputs)
+function admittance_matrix(::NetworkRMS, inputs::Inputs)
     n_buses = num_buses(inputs)
 
     # the matrix is assembled from (row, column, value) triplets, and sparse sums repeated positions.
@@ -53,37 +53,24 @@ function admittance_matrix(inputs::Inputs)
     return sparse(rows, cols, values, n_buses, n_buses)
 end
 
-function initialize_Ybus!(inputs::Inputs)
-    network = get_network(inputs)
-    Ybus = admittance_matrix(inputs)
-    network.Ybus_cache = Ybus
-    network.Ybus_lu = lu(Ybus)
+# The bus voltages of the phasor networks are complex phasors in the synchronous reference frame, stored as Vr and Vi
+# in the bus states. The devices read them only through this function, so a formulation whose voltages are not
+# phasors gives its own interface here
+function bus_voltage_phasor(::PhasorNetwork, bus_state::BusState, ts::Int)
+    return bus_state.Vr[ts] + im * bus_state.Vi[ts]
+end
+
+function store_bus_voltages!(::PhasorNetwork, results::Results, V::Vector{ComplexF64}, ts::Int)
+    for (bus_idx, state) in enumerate(results.bus)
+        state.Vr[ts] = real(V[bus_idx])
+        state.Vi[ts] = imag(V[bus_idx])
+    end
     return nothing
 end
 
-function cache_Ybus!(inputs::Inputs, ts::Int)
-    # the perturbations only change the state of the elements, and the admittance matrix is rebuilt from that state
-    current_perturbations = perturbations_at(inputs, ts)
-    for perturbation in current_perturbations
-        apply_perturbation!(inputs, perturbation)
-    end
-    if isempty(current_perturbations)
-        return false
-    end
-    network = get_network(inputs)
-    Ybus = admittance_matrix(inputs)
-    network.Ybus_cache = Ybus
-    Ybus_lu = network_Ybus_lu(network)
-    lu!(Ybus_lu, Ybus)
-
-    return true
-end
-
-# solves the network with the generator and IBR states at ts and writes the voltages, currents, electrical powers and
-# IBR measurements at ts
-function solve_network!(inputs::Inputs, results::Results, ts::Int)
-    # The current vector I only includes the generators and IBRs that are in service, loads are included in the Ybus
-    # matrix
+# The current vector I only includes the generators and IBRs that are in service, since the loads are included in the
+# admittance matrix
+function current_injections(::PhasorNetwork, inputs::Inputs, results::Results, ts::Int)
     I = zeros(ComplexF64, num_buses(inputs))
     for (generator, state) in zip(inputs.generators, results.generator)
         if !generator_tripped(generator)
@@ -93,28 +80,52 @@ function solve_network!(inputs::Inputs, results::Results, ts::Int)
     for (ibr, state) in zip(inputs.ibrs, results.ibr)
         if !ibr_tripped(ibr)
             bus_idx = ibr_bus(ibr)
-            I[bus_idx] += ibr_current_network_contribution(results, ibr, state, ts)
+            I[bus_idx] += ibr_current_network_contribution(inputs, results, ibr, state, ts)
         end
     end
-    network = get_network(inputs)
-    Ybus_lu = network_Ybus_lu(network)
-    V = Ybus_lu \ I
+    return I
+end
 
-    for (bus_idx, state) in enumerate(results.bus)
-        state.Vr[ts] = real(V[bus_idx])
-        state.Vi[ts] = imag(V[bus_idx])
-    end
-
+# the currents, terminal voltages, electrical powers and IBR measurements at ts follow from the bus voltages at ts,
+# whatever the formulation of the network
+function update_device_algebraic_variables!(inputs::Inputs, results::Results, ts::Int)
     # the currents come first because the electrical power of the OneDOneQ generator is computed from them
     for (generator, state) in zip(inputs.generators, results.generator)
         state.id[ts], state.iq[ts] = generator_current_dq(inputs, results, generator, state, ts)
-        state.Vt[ts] = terminal_voltage(generator, results, ts)
+        state.Vt[ts] = terminal_voltage(inputs, results, generator, ts)
         state.Pele[ts] = electrical_power(inputs, results, generator, state, ts)
     end
 
     for (ibr, state) in zip(inputs.ibrs, results.ibr)
-        update_ibr_measurements!(results, ibr, state, ts)
+        update_ibr_measurements!(inputs, results, ibr, state, ts)
     end
 
+    return nothing
+end
+
+function initialize_network!(network::NetworkRMS, inputs::Inputs)
+    Ybus = admittance_matrix(network, inputs)
+    network.Ybus_cache = Ybus
+    network.Ybus_lu = lu(Ybus)
+    return nothing
+end
+
+# the perturbations only change the state of the elements, and the admittance matrix is rebuilt from that state
+function rebuild_network!(network::NetworkRMS, inputs::Inputs)
+    Ybus = admittance_matrix(network, inputs)
+    network.Ybus_cache = Ybus
+    Ybus_lu = network_Ybus_lu(network)
+    lu!(Ybus_lu, Ybus)
+    return nothing
+end
+
+# solves the network with the generator and IBR states at ts and writes the voltages, currents, electrical powers and
+# IBR measurements at ts
+function solve_network!(network::NetworkRMS, inputs::Inputs, results::Results, ts::Int)
+    I = current_injections(network, inputs, results, ts)
+    Ybus_lu = network_Ybus_lu(network)
+    V = Ybus_lu \ I
+    store_bus_voltages!(network, results, V, ts)
+    update_device_algebraic_variables!(inputs, results, ts)
     return nothing
 end
