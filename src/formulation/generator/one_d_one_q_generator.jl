@@ -61,12 +61,18 @@ function step_internal_emf!(inputs::Inputs, generator::OneDOneQGenerator, state:
 end
 
 # Current
-function generator_current_dq(inputs::Inputs, results::Results, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
+function generator_current_dq(
+    network::NetworkRMS,
+    inputs::Inputs,
+    results::Results,
+    generator::OneDOneQGenerator,
+    state::OneDOneQGeneratorState,
+    ts::Int,
+)
     if generator_tripped(generator)
         return [0.0, 0.0]
     end
     bus_state = results.bus[generator_bus(generator)]
-    network = get_network(inputs)
     V = bus_voltage_phasor(network, bus_state, ts)
     Ra = generator_Ra(inputs, generator)
     Xq_prime = generator_Xq_prime(inputs, generator)
@@ -79,38 +85,48 @@ function generator_current_dq(inputs::Inputs, results::Results, generator::OneDO
     return Idq
 end
 
-function generator_current(inputs::Inputs, results::Results, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
-    Idq = generator_current_dq(inputs, results, generator, state, ts)
-    Ir, Ii = dq_to_ri(state.delta[ts]) * Idq
-    return Ir + im * Ii
-end
-
-function generator_current_network_contribution(inputs::Inputs, results::Results, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
-    # Ybus includes the generator admittance, so its current times V is added back here. The terms in V cancel
-    # when Xd' = Xq', and otherwise V comes from the previous network solution and converges with the corrector
-    Iri = generator_current(inputs, results, generator, state, ts)
-    bus_state = results.bus[generator_bus(generator)]
-    network = get_network(inputs)
-    V = bus_voltage_phasor(network, bus_state, ts)
-    return Iri + V * generator_admittance(inputs, generator)
-end
-
-# Electrical power
-function electrical_power(
+function generator_current(
+    network::NetworkRMS,
     inputs::Inputs,
     results::Results,
     generator::OneDOneQGenerator,
     state::OneDOneQGeneratorState,
     ts::Int,
 )
+    Idq = generator_current_dq(network, inputs, results, generator, state, ts)
+    Ir, Ii = dq_to_ri(state.delta[ts]) * Idq
+    return Ir + im * Ii
+end
+
+function generator_current_network_contribution(
+    network::NetworkRMS,
+    inputs::Inputs,
+    results::Results,
+    generator::OneDOneQGenerator,
+    state::OneDOneQGeneratorState,
+    ts::Int,
+)
+    # Ybus includes the generator admittance, so its current times V is added back here. The terms in V cancel
+    # when Xd' = Xq', and otherwise V comes from the previous network solution and converges with the corrector
+    Iri = generator_current(network, inputs, results, generator, state, ts)
+    bus_state = results.bus[generator_bus(generator)]
+    V = bus_voltage_phasor(network, bus_state, ts)
+    return Iri + V * generator_admittance(inputs, generator)
+end
+
+# Electrical power
+# The electrical power is written with the internal EMF and the stator currents id and iq at ts, which are computed
+# before it. With the stator equations vd = ed' - Ra id + Xq' iq and vq = eq' - Xd' id - Ra iq, the terminal power plus
+# the losses in Ra, (vq + Ra iq) iq + (vd + Ra id) id, is equal to the expression below. It does not use the terminal
+# voltage, so it also holds when the stator has the L di/dt term of the dynamic phasor network
+function electrical_power(inputs::Inputs, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
     if generator_tripped(generator)
         return 0.0
     end
-    bus_state = results.bus[generator_bus(generator)]
-    network = get_network(inputs)
-    V = bus_voltage_phasor(network, bus_state, ts)
-    Ra = generator_Ra(inputs, generator)
-    vd, vq = ri_to_dq(state.delta[ts]) * [real(V); imag(V)]
-    Pele = (vq + Ra * state.iq[ts]) * state.iq[ts] + (vd + Ra * state.id[ts]) * state.id[ts]
+    Xd_prime = generator_Xd_prime(inputs, generator)
+    Xq_prime = generator_Xq_prime(inputs, generator)
+    id = state.id[ts]
+    iq = state.iq[ts]
+    Pele = state.ed_prime[ts] * id + state.eq_prime[ts] * iq + (Xq_prime - Xd_prime) * id * iq
     return Pele
 end

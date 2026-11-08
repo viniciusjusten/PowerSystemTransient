@@ -49,18 +49,27 @@ function initialize_ibr_controls!(inputs::Inputs, results::Results)
     return nothing
 end
 
+# each network formulation checks the perturbations it is able to apply
+function validate_perturbations(network::Network, inputs::Inputs)
+    for perturbation in inputs.perturbations
+        validate_perturbation(network, perturbation)
+    end
+    return nothing
+end
+
 function initialization(inputs::Inputs)
+    network = get_network(inputs)
+    validate_network(network, inputs)
+    validate_perturbations(network, inputs)
     validate_ibr_freq_estimations(inputs)
 
     results = Results(inputs)
-    network = get_network(inputs)
 
     reset_element_states!(inputs)
     initialize_buses!(network, inputs, results)
     initialize_generators!(inputs, results)
     initialize_ibr_converters_from_power_flow!(inputs, results)
-    initialize_network!(network, inputs)
-    solve_network!(network, inputs, results, 1) # V, Pele, Pmed and Qmed at t = 0 from the initial states
+    initialize_network!(network, inputs, results) # V, Pele, Pmed and Qmed at t = 0 from the initial states
     initialize_mechanical_powers!(inputs, results)
     initialize_voltage_regulators!(inputs, results)
     initialize_bus_freq_estimations!(inputs, results)
