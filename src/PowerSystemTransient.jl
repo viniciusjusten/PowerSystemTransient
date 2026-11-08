@@ -25,6 +25,7 @@ include("states/generator/governor.jl")
 include("states/generator/voltage_regulator.jl")
 include("states/generator/generator.jl")
 include("states/ibr.jl")
+include("states/companion.jl")
 
 include("inputs.jl")
 include("results/results.jl")

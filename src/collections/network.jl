@@ -34,3 +34,5 @@ end
 function NetworkDP()
     return NetworkDP(CompanionElement[], spzeros(ComplexF64, 0, 0), nothing, ComplexF64[])
 end
+
+network_elements(network::NetworkDP) = network.elements

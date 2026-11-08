@@ -18,6 +18,12 @@ struct Inductor <: CompanionElement
     in_service::Bool # indicates if the element is connected
 end
 
+element_from_bus_idx(element::CompanionElement) = element.from_bus_idx
+
+element_to_bus_idx(element::CompanionElement) = element.to_bus_idx
+
+element_in_service(element::CompanionElement) = element.in_service
+
 function Inductor(;
     name::String,
     from_bus_idx::Int,
@@ -29,6 +35,12 @@ function Inductor(;
 )
     return Inductor(name, from_bus_idx, to_bus_idx, resistance, reactance, tap_ratio, in_service)
 end
+
+inductor_resistance(inductor::Inductor) = inductor.resistance
+
+inductor_reactance(inductor::Inductor) = inductor.reactance
+
+inductor_tap_ratio(inductor::Inductor) = inductor.tap_ratio
 
 # Capacitance between two buses, a shunt when to_bus_idx is 0. A conductance in parallel is a separate Resistor
 struct Capacitor <: CompanionElement
@@ -52,6 +64,8 @@ function Capacitor(;
     return Capacitor(name, from_bus_idx, to_bus_idx, susceptance, in_service)
 end
 
+capacitor_susceptance(capacitor::Capacitor) = capacitor.susceptance
+
 # Resistance between two buses, a shunt when to_bus_idx is 0. It has no state
 struct Resistor <: CompanionElement
     name::String
@@ -73,3 +87,5 @@ function Resistor(;
 )
     return Resistor(name, from_bus_idx, to_bus_idx, resistance, in_service)
 end
+
+resistor_resistance(resistor::Resistor) = resistor.resistance
