@@ -1,3 +1,70 @@
+# The stator of the dynamic phasor network is a single RL, which needs the same transient reactance on both axes. The
+# classic generator only has Xd', so it always meets this condition
+function validate_generator(::NetworkDP, inputs::Inputs, generator::OneDOneQGenerator)
+    if generator_Xd_prime(inputs, generator) != generator_Xq_prime(inputs, generator)
+        name = generator_name(generator)
+        error("Xd' different from Xq' is not implemented yet for the dynamic phasor network (generator $name).")
+    end
+    return nothing
+end
+
+function validate_generator(::NetworkDP, ::Inputs, ::ClassicGenerator)
+    return nothing
+end
+
+# The companion model of an RL divides by its inductance, so every circuit needs a positive reactance. A perturbation at
+# t = 0 would solve the network again at the first time step, which has no previous step to give the history currents
+function validate_network(network::NetworkDP, inputs::Inputs)
+    for generator in inputs.generators
+        validate_generator(network, inputs, generator)
+    end
+    for circuit in inputs.circuits
+        if circuit_reactance(circuit) <= 0
+            name = circuit_name(circuit)
+            error("A circuit without a positive reactance is not implemented yet for the dynamic phasor network (circuit $name).")
+        end
+    end
+    for perturbation in inputs.perturbations
+        time = perturbation_time(perturbation)
+        if time_index(inputs, time) == 1
+            name = perturbation_name(perturbation)
+            error("A perturbation at t = 0 is not implemented yet for the dynamic phasor network (perturbation $name).")
+        end
+    end
+    return nothing
+end
+
+# Implemented perturbations. The fault of a short circuit is a Resistor, so only the fault conductance is modelled
+function validate_perturbation(::NetworkDP, perturbation::ShortCircuit)
+    if perturbation_fault_susceptance(perturbation) != 0
+        name = perturbation_name(perturbation)
+        error("A short circuit with fault susceptance is not implemented yet for the dynamic phasor network (perturbation $name).")
+    end
+    return nothing
+end
+
+function validate_perturbation(::NetworkDP, ::ShortCircuitRemoval)
+    return nothing
+end
+
+function validate_perturbation(::NetworkDP, ::CircuitTrip)
+    return nothing
+end
+
+function validate_perturbation(::NetworkDP, ::GeneratorTrip)
+    return nothing
+end
+
+function validate_perturbation(::NetworkDP, ::IBRTrip)
+    return nothing
+end
+
+# Perturbations not implemented yet. The companion elements of a load are built from its power at the initialization
+function validate_perturbation(::NetworkDP, perturbation::LoadChange)
+    name = perturbation_name(perturbation)
+    error("LoadChange is not implemented yet for the dynamic phasor network (perturbation $name).")
+end
+
 # one state per companion element. The list always has the same elements, so its length is known before the
 # initialization
 function allocate_companion_states(::NetworkDP, inputs::Inputs, num_steps::Int)

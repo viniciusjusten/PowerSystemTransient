@@ -570,7 +570,9 @@ function replace_ug2_with_ibr!(buses::Vector{PST.Bus}, generators::Vector{PST.Ge
     return nothing
 end
 
-# the results are written to case_path. With ug2_ibr the generator UG2 is replaced by an IBR
+# the results are written to case_path. With ug2_ibr the generator UG2 is replaced by an IBR. The network is RMS with a
+# 10 ms step by default, and the dynamic phasor network takes a smaller step to follow the transients of the stators
+# and of the network
 function ieee14_inputs(
     case_path::String;
     perturbations::Vector{<:PST.Perturbation} = PST.Perturbation[],
@@ -578,6 +580,9 @@ function ieee14_inputs(
     gov::Bool = false,
     avr::Bool = false,
     ug2_ibr::Bool = false,
+    network::PST.Network = PST.NetworkRMS(),
+    integration_step::Float64 = 0.01,
+    simulation_horizon::Float64 = 10.0,
 )
     buses = ieee14_buses()
     generators = ieee14_generators(generator_model, gov, avr)
@@ -589,8 +594,8 @@ function ieee14_inputs(
         case_path = case_path,
         Sb = 100.0,
         fb = 60.0,
-        integration_step = 0.01,
-        simulation_horizon = 10.0,
+        integration_step = integration_step,
+        simulation_horizon = simulation_horizon,
         tolerance = 1e-10,
         buses = buses,
         circuits = ieee14_circuits(),
@@ -598,6 +603,7 @@ function ieee14_inputs(
         ibrs = ibrs,
         loads = ieee14_loads(),
         perturbations = perturbations,
+        network = network,
     )
 end
 
