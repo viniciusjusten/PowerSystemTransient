@@ -19,3 +19,18 @@ end
 network_Ybus_cache(network::NetworkRMS) = network.Ybus_cache
 
 network_Ybus_lu(network::NetworkRMS) = network.Ybus_lu
+
+# Dynamic phasor representation of the network. Its inductances and capacitances have states, which the implicit
+# trapezoidal rule turns into companion models, so the network is solved as G * V = rhs at each time step
+mutable struct NetworkDP <: PhasorNetwork
+    # Cache
+    elements::Vector{CompanionElement} # companion elements of the circuits, buses and loads, rebuilt at each event. The generator stators are not included
+    G::SparseMatrixCSC{ComplexF64, Int} # conductance matrix of the companion models, rebuilt at each event
+    G_lu::Union{Nothing, SparseArrays.UMFPACK.UmfpackLU{ComplexF64, Int}} # LU factorization of G, refactored at each event
+    rhs::Vector{ComplexF64} # device injections minus the history currents of the elements, rebuilt at each solution
+end
+
+# The elements, the matrix and its factorization are built at the initialization, so the network starts empty
+function NetworkDP()
+    return NetworkDP(CompanionElement[], spzeros(ComplexF64, 0, 0), nothing, ComplexF64[])
+end
