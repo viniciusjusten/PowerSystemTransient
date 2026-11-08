@@ -1,3 +1,8 @@
+# internal EMF in the network frame. E'q lies on the q axis, whose angle in the network frame is delta
+function generator_internal_emf(::ClassicGenerator, state::ClassicGeneratorState, ts::Int)
+    return state.Eq_prime * cis(state.delta[ts])
+end
+
 # Current
 function generator_current(
     network::NetworkRMS,
@@ -12,7 +17,7 @@ function generator_current(
     end
     bus_state = results.bus[generator_bus(generator)]
     V = bus_voltage_phasor(network, bus_state, ts)
-    E = state.Eq_prime * cis(state.delta[ts])
+    E = generator_internal_emf(generator, state, ts)
     I = (E - V) * generator_admittance(inputs, generator)
     return I
 end
@@ -43,7 +48,7 @@ function generator_current_network_contribution(
     state::ClassicGeneratorState,
     ts::Int,
 )
-    E = state.Eq_prime * cis(state.delta[ts])
+    E = generator_internal_emf(generator, state, ts)
     I = E * generator_admittance(inputs, generator)
     return I
 end

@@ -60,6 +60,12 @@ function step_internal_emf!(inputs::Inputs, generator::OneDOneQGenerator, state:
     return nothing
 end
 
+# internal EMF in the network frame, from its d and q components
+function generator_internal_emf(::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
+    Er, Ei = dq_to_ri(state.delta[ts]) * [state.ed_prime[ts]; state.eq_prime[ts]]
+    return Er + im * Ei
+end
+
 # Current
 function generator_current_dq(
     network::NetworkRMS,
