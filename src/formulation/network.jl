@@ -94,7 +94,7 @@ function update_device_algebraic_variables!(network::Network, inputs::Inputs, re
     for (generator, state) in zip(inputs.generators, results.generator)
         state.id[ts], state.iq[ts] = generator_current_dq(network, inputs, results, generator, state, ts)
         state.Vt[ts] = terminal_voltage(inputs, results, generator, ts)
-        state.Pele[ts] = electrical_power(inputs, results, generator, state, ts)
+        state.Pele[ts] = electrical_power(inputs, generator, state, ts)
     end
 
     for (ibr, state) in zip(inputs.ibrs, results.ibr)

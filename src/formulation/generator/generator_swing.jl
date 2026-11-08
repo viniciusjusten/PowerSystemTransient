@@ -1,7 +1,15 @@
 # Swing equation
+# In the RMS network the mechanical torque is taken equal to the mechanical power, which assumes the speed stays
+# close to 1 pu
+function mechanical_torque(::NetworkRMS, state::GeneratorState, ts::Int)
+    return state.Pmec[ts]
+end
+
 function deriv_omega(inputs::Inputs, generator::Generator, state::GeneratorState, ts::Int)
+    network = get_network(inputs)
+    Tmec = mechanical_torque(network, state, ts)
     return 1 / (2 * generator_H(inputs, generator)) * (
-        state.Pmec[ts] -
+        Tmec -
         state.Pele[ts] -
         generator_D(inputs, generator) * (
             state.omega[ts] - 1.0
