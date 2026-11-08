@@ -98,6 +98,22 @@ function push_load_elements!(elements::Vector{CompanionElement}, inputs::Inputs,
     return nothing
 end
 
+# The stator of a generator is an Inductor with the armature resistance and the transient reactance, which is the same
+# on both axes. One of its ends is the bus of the generator and the other is the internal EMF, so in the companion
+# matrix it is a shunt at the bus, and the internal EMF enters the right hand side. A tripped generator keeps its
+# stator out of service
+function generator_stator(inputs::Inputs, generator::Generator)
+    name = generator_name(generator)
+    return Inductor(;
+        name = "generator_$(name)_stator",
+        from_bus_idx = generator_bus(generator),
+        to_bus_idx = 0,
+        resistance = generator_Ra(inputs, generator),
+        reactance = generator_Xd_prime(inputs, generator),
+        in_service = !generator_tripped(generator),
+    )
+end
+
 # The companion elements of the network, built from the current state of the circuits, buses and loads. The stators of
 # the generators also have companion models, but they are not in this list, since their currents are the states id and
 # iq of the generators and one of their ends is the internal EMF instead of a bus. The list always has the same

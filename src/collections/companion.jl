@@ -42,6 +42,11 @@ inductor_reactance(inductor::Inductor) = inductor.reactance
 
 inductor_tap_ratio(inductor::Inductor) = inductor.tap_ratio
 
+# only an Inductor can be the series branch of a transformer, so the other elements have no tap
+element_tap_ratio(::CompanionElement) = 1.0
+
+element_tap_ratio(element::Inductor) = inductor_tap_ratio(element)
+
 # Capacitance between two buses, a shunt when to_bus_idx is 0. A conductance in parallel is a separate Resistor
 struct Capacitor <: CompanionElement
     name::String
