@@ -72,6 +72,11 @@ function current_injections(network::NetworkRMS, inputs::Inputs, results::Result
     return I
 end
 
+# the RMS network is algebraic, so it has no companion elements and no states of its own
+function allocate_companion_states(::NetworkRMS, ::Inputs, ::Int)
+    return CompanionState[]
+end
+
 # the RMS network models every element and every perturbation, so there is nothing to check
 function validate_network(::NetworkRMS, ::Inputs)
     return nothing
