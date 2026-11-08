@@ -49,38 +49,45 @@ function bus_voltages_at(network::PhasorNetwork, results::Results, ts::Int)
     return V
 end
 
-function apply_perturbations!(network::Network, inputs::Inputs, results::Results, ts::Int)
+# applies the perturbations at ts and returns true when there was at least one. The perturbations only change the
+# state of the elements, and the network is rebuilt from that state
+function apply_perturbations!(network::Network, inputs::Inputs, ts::Int)
     current_perturbations = perturbations_at(inputs, ts)
     if isempty(current_perturbations)
-        return nothing
+        return false
     end
-    # the perturbations only change the state of the elements, and the network is rebuilt from that state
     for perturbation in current_perturbations
         apply_perturbation!(inputs, perturbation)
     end
     rebuild_network!(network, inputs)
-
-    # a perturbation at ts changes the voltages and electrical powers at that instant, so the network is
-    # solved again at ts and the step to ts + 1 starts from the values after the perturbation.
-    # The states are continuous and keep their values at ts.
-    # The Norton current of the OneDOneQ generator depends on V when Xd' differs from Xq', so the network
-    # is solved until the voltages stop changing
-    for iteration in 1:max_iterations(inputs)
-        V_previous = bus_voltages_at(network, results, ts)
-        solve_network!(network, inputs, results, ts)
-        V = bus_voltages_at(network, results, ts)
-        if maximum(abs.(V .- V_previous)) < tolerance(inputs)
-            return nothing
-        end
-    end
-    error("The network did not converge after the perturbations at time step $ts.")
+    return true
 end
 
 # advances the simulation from the time index ts to ts + 1
 function step!(inputs::Inputs, results::Results, ts::Int)
     network = get_network(inputs)
 
-    apply_perturbations!(network, inputs, results, ts) # rebuild the network and solve it again at ts if there are perturbations at this instant
+    perturbed = apply_perturbations!(network, inputs, ts)
+    if perturbed
+        # a perturbation at ts changes the voltages and electrical powers at that instant, so the network is
+        # solved again at ts and the step to ts + 1 starts from the values after the perturbation.
+        # The states are continuous and keep their values at ts.
+        # The Norton current of the OneDOneQ generator, when Xd' differs from Xq', and the current of the IBRs
+        # depend on V, so the network is solved until the voltages stop changing
+        network_converged = false
+        for iteration in 1:max_iterations(inputs)
+            V_previous = bus_voltages_at(network, results, ts)
+            solve_network!(network, inputs, results, ts)
+            V = bus_voltages_at(network, results, ts)
+            if maximum(abs.(V .- V_previous)) < tolerance(inputs)
+                network_converged = true
+                break
+            end
+        end
+        if !network_converged
+            error("The network did not converge after the perturbations at time step $ts.")
+        end
+    end
 
     predict_voltages!(network, results, ts)
     for (generator, state) in zip(inputs.generators, results.generator)

@@ -61,12 +61,18 @@ function step_internal_emf!(inputs::Inputs, generator::OneDOneQGenerator, state:
 end
 
 # Current
-function generator_current_dq(inputs::Inputs, results::Results, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
+function generator_current_dq(
+    network::NetworkRMS,
+    inputs::Inputs,
+    results::Results,
+    generator::OneDOneQGenerator,
+    state::OneDOneQGeneratorState,
+    ts::Int,
+)
     if generator_tripped(generator)
         return [0.0, 0.0]
     end
     bus_state = results.bus[generator_bus(generator)]
-    network = get_network(inputs)
     V = bus_voltage_phasor(network, bus_state, ts)
     Ra = generator_Ra(inputs, generator)
     Xq_prime = generator_Xq_prime(inputs, generator)
@@ -79,18 +85,31 @@ function generator_current_dq(inputs::Inputs, results::Results, generator::OneDO
     return Idq
 end
 
-function generator_current(inputs::Inputs, results::Results, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
-    Idq = generator_current_dq(inputs, results, generator, state, ts)
+function generator_current(
+    network::NetworkRMS,
+    inputs::Inputs,
+    results::Results,
+    generator::OneDOneQGenerator,
+    state::OneDOneQGeneratorState,
+    ts::Int,
+)
+    Idq = generator_current_dq(network, inputs, results, generator, state, ts)
     Ir, Ii = dq_to_ri(state.delta[ts]) * Idq
     return Ir + im * Ii
 end
 
-function generator_current_network_contribution(inputs::Inputs, results::Results, generator::OneDOneQGenerator, state::OneDOneQGeneratorState, ts::Int)
+function generator_current_network_contribution(
+    network::NetworkRMS,
+    inputs::Inputs,
+    results::Results,
+    generator::OneDOneQGenerator,
+    state::OneDOneQGeneratorState,
+    ts::Int,
+)
     # Ybus includes the generator admittance, so its current times V is added back here. The terms in V cancel
     # when Xd' = Xq', and otherwise V comes from the previous network solution and converges with the corrector
-    Iri = generator_current(inputs, results, generator, state, ts)
+    Iri = generator_current(network, inputs, results, generator, state, ts)
     bus_state = results.bus[generator_bus(generator)]
-    network = get_network(inputs)
     V = bus_voltage_phasor(network, bus_state, ts)
     return Iri + V * generator_admittance(inputs, generator)
 end

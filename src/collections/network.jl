@@ -1,7 +1,7 @@
 abstract type Network end
 
-# Networks whose bus voltages are complex phasors in the synchronous reference frame. The devices see the same
-# interface in all of them, and only the solution of the network changes
+# Networks whose bus voltages are complex phasors in the synchronous reference frame, so the devices read their
+# voltages in the same way in all of them
 abstract type PhasorNetwork <: Network end
 
 # Phasor (RMS) representation of the network, solved algebraically as Ybus * V = I at each time step

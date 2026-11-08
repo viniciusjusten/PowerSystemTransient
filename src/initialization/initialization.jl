@@ -59,8 +59,7 @@ function initialization(inputs::Inputs)
     initialize_buses!(network, inputs, results)
     initialize_generators!(inputs, results)
     initialize_ibr_converters_from_power_flow!(inputs, results)
-    initialize_network!(network, inputs)
-    solve_network!(network, inputs, results, 1) # V, Pele, Pmed and Qmed at t = 0 from the initial states
+    initialize_network!(network, inputs, results) # V, Pele, Pmed and Qmed at t = 0 from the initial states
     initialize_mechanical_powers!(inputs, results)
     initialize_voltage_regulators!(inputs, results)
     initialize_bus_freq_estimations!(inputs, results)
