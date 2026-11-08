@@ -38,3 +38,5 @@ end
 network_elements(network::NetworkDP) = network.elements
 
 network_G_lu(network::NetworkDP) = network.G_lu
+
+network_rhs(network::NetworkDP) = network.rhs

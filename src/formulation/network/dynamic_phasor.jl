@@ -146,6 +146,34 @@ function companion_matrix(network::NetworkDP, inputs::Inputs)
     return sparse(rows, cols, values, n_buses, n_buses)
 end
 
+# the history current of an element for the step from ts - 1 to ts, from its voltage and current at ts - 1
+function element_history_current(
+    network::NetworkDP,
+    inputs::Inputs,
+    results::Results,
+    element::CompanionElement,
+    state::CompanionState,
+    ts::Int,
+)
+    V_previous = element_voltage(network, element, results, ts - 1)
+    I_previous = state.Ir[ts-1] + im * state.Ii[ts-1]
+    return companion_history_current(network, inputs, element, V_previous, I_previous)
+end
+
+# The known part I_hist of the current of an element moves to the right hand side of G V = rhs. The current leaves the
+# sending end as tap * I and arrives at the receiving end as I, so the sending end loses tap * I_hist and the receiving
+# end gains I_hist
+function add_history_to_rhs!(rhs::Vector{ComplexF64}, element::CompanionElement, I_hist::ComplexF64)
+    from = element_from_bus_idx(element)
+    to = element_to_bus_idx(element)
+    tap = element_tap_ratio(element)
+    rhs[from] -= tap * I_hist
+    if to != 0
+        rhs[to] += I_hist
+    end
+    return nothing
+end
+
 function store_companion_current!(state::CompanionState, I::ComplexF64, ts::Int)
     state.Ir[ts] = real(I)
     state.Ii[ts] = imag(I)
@@ -174,6 +202,7 @@ function initialize_network!(network::NetworkDP, inputs::Inputs, results::Result
     G = companion_matrix(network, inputs)
     network.G = G
     network.G_lu = lu(G)
+    network.rhs = zeros(ComplexF64, num_buses(inputs))
     return nothing
 end
 
@@ -185,5 +214,58 @@ function rebuild_network!(network::NetworkDP, inputs::Inputs)
     network.G = G
     G_lu = network_G_lu(network)
     lu!(G_lu, G)
+    return nothing
+end
+
+# Solves the network with the generator and IBR states at ts and writes the voltages, the currents of the elements and
+# the device variables at ts. The history currents come from the voltages and currents at ts - 1, so they stay the same
+# in every iteration of the corrector at ts, and the currents written at ts give the history of the next step
+function solve_network!(network::NetworkDP, inputs::Inputs, results::Results, ts::Int)
+    rhs = network_rhs(network)
+    fill!(rhs, 0.0 + 0.0im)
+
+    # injections of the devices that are in service
+    for (generator, state) in zip(inputs.generators, results.generator)
+        if !generator_tripped(generator)
+            bus_idx = generator_bus(generator)
+            rhs[bus_idx] += generator_current_network_contribution(network, inputs, results, generator, state, ts)
+        end
+    end
+    for (ibr, state) in zip(inputs.ibrs, results.ibr)
+        if !ibr_tripped(ibr)
+            bus_idx = ibr_bus(ibr)
+            rhs[bus_idx] += ibr_current_network_contribution(inputs, results, ibr, state, ts)
+        end
+    end
+
+    # history currents of the elements in service, kept for their currents after the solution
+    elements = network_elements(network)
+    histories = zeros(ComplexF64, length(elements))
+    for (element_idx, element) in enumerate(elements)
+        if element_in_service(element)
+            state = results.companion[element_idx]
+            I_hist = element_history_current(network, inputs, results, element, state, ts)
+            histories[element_idx] = I_hist
+            add_history_to_rhs!(rhs, element, I_hist)
+        end
+    end
+
+    G_lu = network_G_lu(network)
+    V = G_lu \ rhs
+    store_bus_voltages!(network, results, V, ts)
+
+    # currents of the elements at ts, zero for an element out of service
+    for (element_idx, element) in enumerate(elements)
+        I = 0.0 + 0.0im
+        if element_in_service(element)
+            V_element = element_voltage(network, element, results, ts)
+            G = companion_conductance(network, inputs, element)
+            I = G * V_element + histories[element_idx]
+        end
+        state = results.companion[element_idx]
+        store_companion_current!(state, I, ts)
+    end
+
+    update_device_algebraic_variables!(network, inputs, results, ts)
     return nothing
 end
