@@ -20,9 +20,14 @@ network_Ybus_cache(network::NetworkRMS) = network.Ybus_cache
 
 network_Ybus_lu(network::NetworkRMS) = network.Ybus_lu
 
-# Dynamic phasor representation of the network. Its inductances and capacitances have states, which the implicit
-# trapezoidal rule turns into companion models, so the network is solved as G * V = rhs at each time step
-mutable struct NetworkDP <: PhasorNetwork
+# Networks whose inductances and capacitances have states, which the implicit trapezoidal rule turns into companion
+# models, so the network is solved as G * V = rhs at each time step. The formulations differ only in the companion
+# equations and in the reference frame in which the network is solved. The bus voltages are still stored as phasors in
+# the synchronous reference frame, so these networks are also phasor networks
+abstract type EMTNetwork <: PhasorNetwork end
+
+# Dynamic phasor representation of the network, solved in the synchronous reference frame
+mutable struct NetworkDP <: EMTNetwork
     # Cache
     elements::Vector{CompanionElement} # companion elements of the circuits, buses and loads, rebuilt at each event. The generator stators are not included
     G::SparseMatrixCSC{ComplexF64, Int} # conductance matrix of the companion models, rebuilt at each event
@@ -35,8 +40,8 @@ function NetworkDP()
     return NetworkDP(CompanionElement[], spzeros(ComplexF64, 0, 0), nothing, ComplexF64[])
 end
 
-network_elements(network::NetworkDP) = network.elements
+network_elements(network::EMTNetwork) = network.elements
 
-network_G_lu(network::NetworkDP) = network.G_lu
+network_G_lu(network::EMTNetwork) = network.G_lu
 
-network_rhs(network::NetworkDP) = network.rhs
+network_rhs(network::EMTNetwork) = network.rhs
