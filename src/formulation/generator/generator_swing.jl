@@ -5,9 +5,9 @@ function mechanical_torque(::NetworkRMS, state::GeneratorState, ts::Int)
     return state.Pmec[ts]
 end
 
-# In the dynamic phasor network the mechanical torque is the mechanical power divided by the speed. Pele, written with
-# the internal EMF as e'd id + e'q iq, is already the electromagnetic torque psi_d iq - psi_q id of the stator
-function mechanical_torque(::NetworkDP, state::GeneratorState, ts::Int)
+# In the EMT networks the mechanical torque is the mechanical power divided by the speed. Pele, written with the
+# internal EMF as e'd id + e'q iq, is already the electromagnetic torque psi_d iq - psi_q id of the stator
+function mechanical_torque(::EMTNetwork, state::GeneratorState, ts::Int)
     return state.Pmec[ts] / state.omega[ts]
 end
 

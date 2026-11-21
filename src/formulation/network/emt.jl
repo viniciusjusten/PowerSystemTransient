@@ -1,79 +1,82 @@
-# The stator of the dynamic phasor network is a single RL, which needs the same transient reactance on both axes. The
-# classic generator only has Xd', so it always meets this condition
-function validate_generator(::NetworkDP, inputs::Inputs, generator::OneDOneQGenerator)
+# Network solution shared by the EMT networks. Only the companion models and the reference frame in which the network
+# is solved depend on the formulation, and they live in the file of each network
+
+# The stator of the EMT networks is a single RL, which needs the same transient reactance on both axes. The classic
+# generator only has Xd', so it always meets this condition
+function validate_generator(::EMTNetwork, inputs::Inputs, generator::OneDOneQGenerator)
     if generator_Xd_prime(inputs, generator) != generator_Xq_prime(inputs, generator)
         name = generator_name(generator)
-        error("Xd' different from Xq' is not implemented yet for the dynamic phasor network (generator $name).")
+        error("Xd' different from Xq' is not implemented yet for the EMT networks (generator $name).")
     end
     return nothing
 end
 
-function validate_generator(::NetworkDP, ::Inputs, ::ClassicGenerator)
+function validate_generator(::EMTNetwork, ::Inputs, ::ClassicGenerator)
     return nothing
 end
 
 # The companion model of an RL divides by its inductance, so every circuit needs a positive reactance. A perturbation at
 # t = 0 would solve the network again at the first time step, which has no previous step to give the history currents
-function validate_network(network::NetworkDP, inputs::Inputs)
+function validate_network(network::EMTNetwork, inputs::Inputs)
     for generator in inputs.generators
         validate_generator(network, inputs, generator)
     end
     for circuit in inputs.circuits
         if circuit_reactance(circuit) <= 0
             name = circuit_name(circuit)
-            error("A circuit without a positive reactance is not implemented yet for the dynamic phasor network (circuit $name).")
+            error("A circuit without a positive reactance is not implemented yet for the EMT networks (circuit $name).")
         end
     end
     for perturbation in inputs.perturbations
         time = perturbation_time(perturbation)
         if time_index(inputs, time) == 1
             name = perturbation_name(perturbation)
-            error("A perturbation at t = 0 is not implemented yet for the dynamic phasor network (perturbation $name).")
+            error("A perturbation at t = 0 is not implemented yet for the EMT networks (perturbation $name).")
         end
     end
     return nothing
 end
 
 # Implemented perturbations. The fault of a short circuit is a Resistor, so only the fault conductance is modelled
-function validate_perturbation(::NetworkDP, perturbation::ShortCircuit)
+function validate_perturbation(::EMTNetwork, perturbation::ShortCircuit)
     if perturbation_fault_susceptance(perturbation) != 0
         name = perturbation_name(perturbation)
-        error("A short circuit with fault susceptance is not implemented yet for the dynamic phasor network (perturbation $name).")
+        error("A short circuit with fault susceptance is not implemented yet for the EMT networks (perturbation $name).")
     end
     return nothing
 end
 
-function validate_perturbation(::NetworkDP, ::ShortCircuitRemoval)
+function validate_perturbation(::EMTNetwork, ::ShortCircuitRemoval)
     return nothing
 end
 
-function validate_perturbation(::NetworkDP, ::CircuitTrip)
+function validate_perturbation(::EMTNetwork, ::CircuitTrip)
     return nothing
 end
 
-function validate_perturbation(::NetworkDP, ::GeneratorTrip)
+function validate_perturbation(::EMTNetwork, ::GeneratorTrip)
     return nothing
 end
 
-function validate_perturbation(::NetworkDP, ::IBRTrip)
+function validate_perturbation(::EMTNetwork, ::IBRTrip)
     return nothing
 end
 
 # Perturbations not implemented yet. The companion elements of a load are built from its power at the initialization
-function validate_perturbation(::NetworkDP, perturbation::LoadChange)
+function validate_perturbation(::EMTNetwork, perturbation::LoadChange)
     name = perturbation_name(perturbation)
-    error("LoadChange is not implemented yet for the dynamic phasor network (perturbation $name).")
+    error("LoadChange is not implemented yet for the EMT networks (perturbation $name).")
 end
 
 # one state per companion element. The list always has the same elements, so its length is known before the
 # initialization
-function allocate_companion_states(::NetworkDP, inputs::Inputs, num_steps::Int)
+function allocate_companion_states(::EMTNetwork, inputs::Inputs, num_steps::Int)
     elements = companion_elements(inputs)
     return CompanionState[CompanionState(num_steps) for _ in elements]
 end
 
 # the voltage of a bus at ts, or zero for the ground, which has index 0
-function bus_or_ground_voltage(network::NetworkDP, results::Results, bus_idx::Int, ts::Int)
+function bus_or_ground_voltage(network::EMTNetwork, results::Results, bus_idx::Int, ts::Int)
     if bus_idx == 0
         return 0.0 + 0.0im
     end
@@ -83,7 +86,7 @@ end
 
 # the voltage across an element at ts, from its sending end to its receiving end, with the tap applied to the voltage
 # of the sending end
-function element_voltage(network::NetworkDP, element::CompanionElement, results::Results, ts::Int)
+function element_voltage(network::EMTNetwork, element::CompanionElement, results::Results, ts::Int)
     from_bus_idx = element_from_bus_idx(element)
     to_bus_idx = element_to_bus_idx(element)
     V_from = bus_or_ground_voltage(network, results, from_bus_idx, ts)
@@ -93,70 +96,20 @@ function element_voltage(network::NetworkDP, element::CompanionElement, results:
 end
 
 # Steady state currents, with the derivatives at zero. Z = R + j wb L and Y = j wb C, where wb L and wb C are the
-# reactance and the susceptance at the base frequency
-function steady_state_current(::NetworkDP, element::Inductor, V::ComplexF64)
+# reactance and the susceptance at the base frequency. The sinusoidal steady state written in the synchronous reference
+# frame is the same in every EMT network
+function steady_state_current(::EMTNetwork, element::Inductor, V::ComplexF64)
     Z = inductor_resistance(element) + im * inductor_reactance(element)
     return V / Z
 end
 
-function steady_state_current(::NetworkDP, element::Capacitor, V::ComplexF64)
+function steady_state_current(::EMTNetwork, element::Capacitor, V::ComplexF64)
     Y = im * capacitor_susceptance(element)
     return Y * V
 end
 
-function steady_state_current(::NetworkDP, element::Resistor, V::ComplexF64)
+function steady_state_current(::EMTNetwork, element::Resistor, V::ComplexF64)
     return V / resistor_resistance(element)
-end
-
-# Companion conductances of the implicit trapezoidal rule, with h the integration step, wb = 2 pi fb, L = X / wb and
-# C = B / wb. The current of an element is I(t+1) = G V(t+1) + I_hist
-function companion_conductance(::NetworkDP, inputs::Inputs, element::Inductor)
-    h = integration_step(inputs)
-    wb = 2 * pi * fb(inputs)
-    L = inductor_reactance(element) / wb
-    Z = inductor_resistance(element) + im * wb * L
-    return 1 / (2 * L / h + Z)
-end
-
-function companion_conductance(::NetworkDP, inputs::Inputs, element::Capacitor)
-    h = integration_step(inputs)
-    wb = 2 * pi * fb(inputs)
-    C = capacitor_susceptance(element) / wb
-    Y = im * wb * C
-    return 2 * C / h + Y
-end
-
-# the conductances of the dynamic phasor network are complex, so the resistor returns a complex value as well
-function companion_conductance(::NetworkDP, ::Inputs, element::Resistor)
-    G = 1 / resistor_resistance(element)
-    return complex(G)
-end
-
-# History currents of the implicit trapezoidal rule, from the voltage V and the current I of the element at the previous
-# step, with the same h, wb, L and C of the companion conductances
-function companion_history_current(::NetworkDP, inputs::Inputs, element::Inductor, V::ComplexF64, I::ComplexF64)
-    h = integration_step(inputs)
-    wb = 2 * pi * fb(inputs)
-    L = inductor_reactance(element) / wb
-    Z = inductor_resistance(element) + im * wb * L
-    Zh_2L = Z * h / (2 * L)
-    h_2L = h / (2 * L)
-    return (1 - Zh_2L) * I / (1 + Zh_2L) + h_2L * V / (1 + Zh_2L)
-end
-
-function companion_history_current(::NetworkDP, inputs::Inputs, element::Capacitor, V::ComplexF64, I::ComplexF64)
-    h = integration_step(inputs)
-    wb = 2 * pi * fb(inputs)
-    C = capacitor_susceptance(element) / wb
-    Y = im * wb * C
-    Yh_2C = Y * h / (2 * C)
-    h_2C = h / (2 * C)
-    return -I - (1 - Yh_2C) * V / h_2C
-end
-
-# the resistor is algebraic, so it has no history
-function companion_history_current(::NetworkDP, ::Inputs, ::Resistor, ::ComplexF64, ::ComplexF64)
-    return 0.0 + 0.0im
 end
 
 # the positions an element with companion conductance G takes in the matrix, with the tap applied to the sending end,
@@ -186,7 +139,7 @@ end
 # The conductance matrix of the companion models, assembled from (row, column, value) triplets as in admittance_matrix.
 # Elements out of service and stators of tripped generators still contribute zeros at their positions, so the sparsity
 # pattern never changes and the symbolic factorization of the LU stays valid after a perturbation
-function companion_matrix(network::NetworkDP, inputs::Inputs)
+function companion_matrix(network::EMTNetwork, inputs::Inputs)
     n_buses = num_buses(inputs)
     rows = Int[]
     cols = Int[]
@@ -215,7 +168,7 @@ end
 
 # the history current of an element for the step from ts - 1 to ts, from its voltage and current at ts - 1
 function element_history_current(
-    network::NetworkDP,
+    network::EMTNetwork,
     inputs::Inputs,
     results::Results,
     element::CompanionElement,
@@ -251,7 +204,7 @@ end
 # temporary NetworkRMS, which writes V, id, iq, Pele and the IBR measurements at t = 0. The currents of the elements at
 # t = 0 follow from those voltages with the derivatives at zero, and they give the history of the first step. The
 # companion matrix and its factorization are built last, for the steps that follow
-function initialize_network!(network::NetworkDP, inputs::Inputs, results::Results)
+function initialize_network!(network::EMTNetwork, inputs::Inputs, results::Results)
     steady_state_network = NetworkRMS()
     initialize_network!(steady_state_network, inputs, results)
 
@@ -275,7 +228,7 @@ end
 
 # the perturbations only change the state of the elements, so the list of elements and the companion matrix are rebuilt
 # from that state, with the same sparsity pattern
-function rebuild_network!(network::NetworkDP, inputs::Inputs)
+function rebuild_network!(network::EMTNetwork, inputs::Inputs)
     network.elements = companion_elements(inputs)
     G = companion_matrix(network, inputs)
     network.G = G
@@ -287,7 +240,7 @@ end
 # Solves the network with the generator and IBR states at ts and writes the voltages, the currents of the elements and
 # the device variables at ts. The history currents come from the voltages and currents at ts - 1, so they stay the same
 # in every iteration of the corrector at ts, and the currents written at ts give the history of the next step
-function solve_network!(network::NetworkDP, inputs::Inputs, results::Results, ts::Int)
+function solve_network!(network::EMTNetwork, inputs::Inputs, results::Results, ts::Int)
     rhs = network_rhs(network)
     fill!(rhs, 0.0 + 0.0im)
 
