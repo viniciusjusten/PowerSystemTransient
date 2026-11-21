@@ -84,20 +84,20 @@ function bus_or_ground_voltage(network::EMTNetwork, results::Results, bus_idx::I
     return bus_voltage_phasor(network, bus_state, ts)
 end
 
-# the voltage across an element at ts, from its sending end to its receiving end, with the tap applied to the voltage
-# of the sending end
-function element_voltage(network::EMTNetwork, element::CompanionElement, results::Results, ts::Int)
+# The voltage across an element at ts in the reference frame of the network, from its sending end to its receiving end,
+# with the tap applied to the voltage of the sending end
+function element_voltage(network::EMTNetwork, inputs::Inputs, results::Results, element::CompanionElement, ts::Int)
     from_bus_idx = element_from_bus_idx(element)
     to_bus_idx = element_to_bus_idx(element)
     V_from = bus_or_ground_voltage(network, results, from_bus_idx, ts)
     V_to = bus_or_ground_voltage(network, results, to_bus_idx, ts)
     tap = element_tap_ratio(element)
-    return tap * V_from - V_to
+    rotation = frame_rotation(network, inputs, ts)
+    return rotation * (tap * V_from - V_to)
 end
 
-# Steady state currents, with the derivatives at zero. Z = R + j wb L and Y = j wb C, where wb L and wb C are the
-# reactance and the susceptance at the base frequency. The sinusoidal steady state written in the synchronous reference
-# frame is the same in every EMT network
+# Steady state currents at the base frequency. Z = R + j wb L and Y = j wb C, where wb L and wb C are the reactance and
+# the susceptance at the base frequency
 function steady_state_current(::EMTNetwork, element::Inductor, V::ComplexF64)
     Z = inductor_resistance(element) + im * inductor_reactance(element)
     return V / Z
@@ -166,7 +166,8 @@ function companion_matrix(network::EMTNetwork, inputs::Inputs)
     return sparse(rows, cols, values, n_buses, n_buses)
 end
 
-# the history current of an element for the step from ts - 1 to ts, from its voltage and current at ts - 1
+# The history current of an element for the step from ts - 1 to ts, from its voltage and current at ts - 1. The current
+# is stored in the synchronous reference frame, so it is rotated to the frame of the network, like the voltage
 function element_history_current(
     network::EMTNetwork,
     inputs::Inputs,
@@ -175,8 +176,10 @@ function element_history_current(
     state::CompanionState,
     ts::Int,
 )
-    V_previous = element_voltage(network, element, results, ts - 1)
-    I_previous = state.Ir[ts-1] + im * state.Ii[ts-1]
+    V_previous = element_voltage(network, inputs, results, element, ts - 1)
+    rotation_previous = frame_rotation(network, inputs, ts - 1)
+    I_previous_synchronous = state.Ir[ts-1] + im * state.Ii[ts-1]
+    I_previous = rotation_previous * I_previous_synchronous
     return companion_history_current(network, inputs, element, V_previous, I_previous)
 end
 
@@ -194,6 +197,7 @@ function add_history_to_rhs!(rhs::Vector{ComplexF64}, element::CompanionElement,
     return nothing
 end
 
+# the current of an element is stored in the synchronous reference frame
 function store_companion_current!(state::CompanionState, I::ComplexF64, ts::Int)
     state.Ir[ts] = real(I)
     state.Ii[ts] = imag(I)
@@ -202,21 +206,23 @@ end
 
 # The network starts in steady state, where it is equal to the RMS network, so the solution at t = 0 comes from a
 # temporary NetworkRMS, which writes V, id, iq, Pele and the IBR measurements at t = 0. The currents of the elements at
-# t = 0 follow from those voltages with the derivatives at zero, and they give the history of the first step. The
-# companion matrix and its factorization are built last, for the steps that follow
+# t = 0 follow from those voltages in steady state, and they give the history of the first step. The companion matrix
+# and its factorization are built last, for the steps that follow
 function initialize_network!(network::EMTNetwork, inputs::Inputs, results::Results)
     steady_state_network = NetworkRMS()
     initialize_network!(steady_state_network, inputs, results)
 
     network.elements = companion_elements(inputs)
     elements = network_elements(network)
+    rotation = frame_rotation(network, inputs, 1)
     for (element, state) in zip(elements, results.companion)
         I = 0.0 + 0.0im
         if element_in_service(element)
-            V = element_voltage(network, element, results, 1)
+            V = element_voltage(network, inputs, results, element, 1)
             I = steady_state_current(network, element, V)
         end
-        store_companion_current!(state, I, 1)
+        I_synchronous = conj(rotation) * I
+        store_companion_current!(state, I_synchronous, 1)
     end
 
     G = companion_matrix(network, inputs)
@@ -239,12 +245,17 @@ end
 
 # Solves the network with the generator and IBR states at ts and writes the voltages, the currents of the elements and
 # the device variables at ts. The history currents come from the voltages and currents at ts - 1, so they stay the same
-# in every iteration of the corrector at ts, and the currents written at ts give the history of the next step
+# in every iteration of the corrector at ts, and the currents written at ts give the history of the next step. The
+# network is solved in its own reference frame, and the voltages and currents go back to the synchronous reference
+# frame before they are stored
 function solve_network!(network::EMTNetwork, inputs::Inputs, results::Results, ts::Int)
     rhs = network_rhs(network)
     fill!(rhs, 0.0 + 0.0im)
+    rotation = frame_rotation(network, inputs, ts)
 
-    # injections of the devices that are in service
+    # Injections of the devices that are in service. The stator methods of each network give the generator injection
+    # already in the frame of the network. The IBR injection is a phasor in the synchronous reference frame, so it is
+    # rotated here
     for (generator, state) in zip(inputs.generators, results.generator)
         if !generator_tripped(generator)
             bus_idx = generator_bus(generator)
@@ -254,7 +265,8 @@ function solve_network!(network::EMTNetwork, inputs::Inputs, results::Results, t
     for (ibr, state) in zip(inputs.ibrs, results.ibr)
         if !ibr_tripped(ibr)
             bus_idx = ibr_bus(ibr)
-            rhs[bus_idx] += ibr_current_network_contribution(inputs, results, ibr, state, ts)
+            I_ibr = ibr_current_network_contribution(inputs, results, ibr, state, ts)
+            rhs[bus_idx] += rotation * I_ibr
         end
     end
 
@@ -272,18 +284,20 @@ function solve_network!(network::EMTNetwork, inputs::Inputs, results::Results, t
 
     G_lu = network_G_lu(network)
     V = G_lu \ rhs
-    store_bus_voltages!(network, results, V, ts)
+    V_synchronous = conj(rotation) * V
+    store_bus_voltages!(network, results, V_synchronous, ts)
 
     # currents of the elements at ts, zero for an element out of service
     for (element_idx, element) in enumerate(elements)
         I = 0.0 + 0.0im
         if element_in_service(element)
-            V_element = element_voltage(network, element, results, ts)
+            V_element = element_voltage(network, inputs, results, element, ts)
             G = companion_conductance(network, inputs, element)
             I = G * V_element + histories[element_idx]
         end
+        I_synchronous = conj(rotation) * I
         state = results.companion[element_idx]
-        store_companion_current!(state, I, ts)
+        store_companion_current!(state, I_synchronous, ts)
     end
 
     update_device_algebraic_variables!(network, inputs, results, ts)

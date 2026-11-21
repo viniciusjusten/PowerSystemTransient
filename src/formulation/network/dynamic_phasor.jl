@@ -1,6 +1,12 @@
 # Companion models of the dynamic phasor network, written in the synchronous reference frame. The rest of the network
 # solution is shared with the other EMT networks, in emt.jl
 
+# The dynamic phasor network is solved in the synchronous reference frame, where the voltages and currents are stored,
+# so there is no rotation between frames
+function frame_rotation(::NetworkDP, ::Inputs, ::Int)
+    return 1.0
+end
+
 # Companion conductances of the implicit trapezoidal rule, with h the integration step, wb = 2 pi fb, L = X / wb and
 # C = B / wb. The current of an element is I(t+1) = G V(t+1) + I_hist
 function companion_conductance(::NetworkDP, inputs::Inputs, element::Inductor)
