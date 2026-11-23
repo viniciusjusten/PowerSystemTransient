@@ -45,16 +45,28 @@ end
 # case data, so E' has derivatives of about 1e-8 at t = 0 and the operating point drifts slowly
 operating_point_tolerance() = 1e-6
 
+# The alpha beta network starts from the phasor steady state, which the trapezoidal rule in the stationary frame only
+# reproduces up to (wb h)^2 / 12 of the reactances, about 3e-5 with a 50 us step, so its operating point moves more.
+# The voltage regulators amplify the small drift of the terminal voltages by their gain, so the field voltages move
+# about 5e-4 in the first 20 ms, while the other time series stay below 1e-4
+alpha_beta_operating_point_tolerance() = 1e-3
+
 # Before the first perturbation every time series stays at its initial value, whatever the generator model.
-# Half a step of margin keeps the comparison from depending on the rounding of the time values
-function test_initial_operating_point_kept(inputs::PST.Inputs, results::PST.Results, first_event_time::Float64)
+# Half a step of margin keeps the comparison from depending on the rounding of the time values. A network whose
+# discrete steady state differs from the phasor one, such as the alpha beta network, gives a larger tolerance
+function test_initial_operating_point_kept(
+    inputs::PST.Inputs,
+    results::PST.Results,
+    first_event_time::Float64;
+    tolerance::Float64 = operating_point_tolerance(),
+)
     time = PST.time_values(inputs)
     margin = PST.integration_step(inputs) / 2
     before_event = time .< first_event_time - margin
     names, columns = model_trajectories(inputs, results)
     for (trajectory_name, trajectory) in zip(names, columns)
         @testset "$trajectory_name before the perturbation" begin
-            @test maximum(abs.(trajectory[before_event] .- trajectory[1])) < operating_point_tolerance()
+            @test maximum(abs.(trajectory[before_event] .- trajectory[1])) < tolerance
         end
     end
     return nothing

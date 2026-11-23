@@ -40,6 +40,21 @@ function NetworkDP()
     return NetworkDP(CompanionElement[], spzeros(ComplexF64, 0, 0), nothing, ComplexF64[])
 end
 
+# Electromagnetic transient representation of a balanced network, solved in the stationary reference frame, where the
+# space vector V_alpha + j V_beta stands for the three phases
+mutable struct NetworkAlphaBeta <: EMTNetwork
+    # Cache
+    elements::Vector{CompanionElement} # companion elements of the circuits, buses and loads, rebuilt at each event. The generator stators are not included
+    G::SparseMatrixCSC{ComplexF64, Int} # conductance matrix of the companion models, rebuilt at each event
+    G_lu::Union{Nothing, SparseArrays.UMFPACK.UmfpackLU{ComplexF64, Int}} # LU factorization of G, refactored at each event
+    rhs::Vector{ComplexF64} # device injections minus the history currents of the elements, rebuilt at each solution
+end
+
+# The elements, the matrix and its factorization are built at the initialization, so the network starts empty
+function NetworkAlphaBeta()
+    return NetworkAlphaBeta(CompanionElement[], spzeros(ComplexF64, 0, 0), nothing, ComplexF64[])
+end
+
 network_elements(network::EMTNetwork) = network.elements
 
 network_G_lu(network::EMTNetwork) = network.G_lu
